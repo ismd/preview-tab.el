@@ -34,6 +34,12 @@ jobs:
       - name: Behavioural suite
         run: make test
 
+      # Without nerd-icons the two icon tests skip themselves, and skipping is
+      # not passing: nothing would check that a bad icon name stays quiet
+      # inside redisplay.
+      - name: Dev dependencies
+        run: make deps
+
       # Needs a real frame: under --batch, `format-mode-line' returns "" for
       # every input, so these assertions would be vacuous.  `script' from
       # util-linux provides the pty.

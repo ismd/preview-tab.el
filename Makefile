@@ -3,9 +3,14 @@ PACKAGE := preview-tab
 MAIN    := $(PACKAGE).el
 ELPA    := .elpa
 
-# Point NERD_ICONS at a nerd-icons checkout to exercise the icon tests:
+LOAD := -L . -L test
+
+# The icon tests skip themselves unless nerd-icons is on the load path, and
+# skipping is not passing: without it nothing checks that a bad icon name stays
+# quiet inside redisplay.  `make deps' puts a copy under $(ELPA) and test-tty
+# finds it there; set NERD_ICONS to use a checkout you already have instead:
 #   make test-tty NERD_ICONS=~/.emacs.d/elpa/nerd-icons
-LOAD := -L . -L test $(if $(NERD_ICONS),-L $(NERD_ICONS))
+NERD_ICONS ?=
 
 .PHONY: all compile deps lint test test-tty clean
 
@@ -22,7 +27,7 @@ compile:
 
 # Packages needed to develop on preview-tab, never to use it.  They live under
 # $(ELPA) so they cannot be confused with the user's own.
-DEPS := package-lint
+DEPS := package-lint nerd-icons
 
 ## Install whatever in DEPS is missing, and nothing else.  Depending on the
 ## $(ELPA) directory instead would go by whether it exists, which says nothing
@@ -71,8 +76,10 @@ test-tty:
 	  echo "          different program under the same name."; \
 	  exit 1; }
 	@rm -f tty-test.log typescript.log
-	@TERM=$(TTY_TERM) script -qec \
-	  "TERM=$(TTY_TERM) TTY_TEST_LOG=tty-test.log $(EMACS) -Q -nw $(LOAD) -l test/run-tty.el" \
+	@icons="$(NERD_ICONS)"; \
+	  [ -n "$$icons" ] || icons=$$(ls -d $(ELPA)/nerd-icons-*/ 2>/dev/null | head -1); \
+	  TERM=$(TTY_TERM) script -qec \
+	  "TERM=$(TTY_TERM) TTY_TEST_LOG=tty-test.log $(EMACS) -Q -nw $(LOAD) $${icons:+-L $$icons} -l test/run-tty.el" \
 	  typescript.log > /dev/null; \
 	  status=$$?; \
 	  if [ -f tty-test.log ]; then \
