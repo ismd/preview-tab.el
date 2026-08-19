@@ -28,7 +28,8 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          sudo apt-get install emacs && emacs --version
+          sudo apt-get update
+          sudo apt-get install -y emacs && emacs --version
           git clone https://github.com/riscy/melpazoid.git ~/melpazoid
           pip install ~/melpazoid
 
