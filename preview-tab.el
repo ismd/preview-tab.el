@@ -315,6 +315,27 @@ killed and never kept."
       ;; before deciding what to do with it.
       (run-at-time 0 nil #'preview-tab--retire old))))
 
+(defun preview-tab--adopt (known)
+  "Make the preview out of whatever file has been visited since KNOWN.
+KNOWN is the `buffer-list' from before the command ran."
+  (let* ((new (seq-filter (lambda (buf)
+                            (and (buffer-file-name buf)
+                                 (not (memq buf known))))
+                          (buffer-list)))
+         ;; A command may open more than one file -- a hook reading something,
+         ;; a language server warming up a workspace.  The one on screen is the
+         ;; one that was asked for.  Failing that, `buffer-list' is
+         ;; most-recently-used first, so take the front.
+         (opened (or (seq-find (lambda (buf) (get-buffer-window buf t)) new)
+                     (car new)))
+         (shown (window-buffer (selected-window))))
+    (cond
+     ;; A file buffer that did not exist before: this is the preview.
+     (opened (preview-tab--mark opened))
+     ;; Revisiting the current preview keeps it a preview.  Anything else was
+     ;; already open, and stays permanent.
+     ((eq shown preview-tab-buffer) (preview-tab--mark shown)))))
+
 (defun preview-tab--call (fn &rest args)
   "Apply FN to ARGS, then treat any file it opened as the preview buffer.
 Reached through `preview-tab--advice' for `preview-tab-commands', and
@@ -324,24 +345,13 @@ or not the mode is on."
       (apply fn args)
     (let ((known (buffer-list))
           (preview-tab--busy t))
-      (prog1 (apply fn args)
-        (let* ((new (seq-filter (lambda (buf)
-                                  (and (buffer-file-name buf)
-                                       (not (memq buf known))))
-                                (buffer-list)))
-               ;; A command may open more than one file -- a hook reading
-               ;; something, a language server warming up a workspace.  The one
-               ;; on screen is the one that was asked for.  Failing that,
-               ;; `buffer-list' is most-recently-used first, so take the front.
-               (opened (or (seq-find (lambda (buf) (get-buffer-window buf t)) new)
-                           (car new)))
-               (shown (window-buffer (selected-window))))
-          (cond
-           ;; A file buffer that did not exist before: this is the preview.
-           (opened (preview-tab--mark opened))
-           ;; Revisiting the current preview keeps it a preview.  Anything else
-           ;; was already open, and stays permanent.
-           ((eq shown preview-tab-buffer) (preview-tab--mark shown))))))))
+      ;; `unwind-protect', not `prog1'.  A command that reaches the file and
+      ;; then signals -- a stale xref location, an erroring hook, plain C-g --
+      ;; would otherwise leave the buffer open and tracked by nobody, which is
+      ;; the one outcome this package exists to avoid.
+      (unwind-protect
+          (apply fn args)
+        (preview-tab--adopt known)))))
 
 (defun preview-tab--advice (fn &rest args)
   "Around advice on `preview-tab-commands': preview the file FN opens.

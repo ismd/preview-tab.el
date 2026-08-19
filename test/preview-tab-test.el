@@ -36,6 +36,14 @@ they are at it."
   (find-file-noselect (preview-tab-test--file "e.txt"))
   (display-buffer (find-file-noselect (preview-tab-test--file name))))
 
+(defun preview-tab-test-open-then-fail (name)
+  "Stand-in command: visit scratch file NAME, then signal.
+Models a command that gets as far as the file and then trips over something
+-- a stale location, a hook that errors."
+  (interactive "sFile: ")
+  (preview-tab-test-open name)
+  (error "Nothing further to see here"))
+
 (defun preview-tab-test--settle ()
   "Let the zero-delay reap timer run."
   (dotimes (_ 5) (sit-for 0.02)))
@@ -233,6 +241,19 @@ happened to read on the side."
         (preview-tab-test--settle))
       (should (preview-tab-test--preview-p "a.txt"))
       (should-not (preview-tab-test--preview-p "e.txt")))))
+
+
+(ert-deftest preview-tab-test-failing-command-still-adopts ()
+  "A command that visits the file and then signals leaves a preview, not a leak.
+The buffer is open either way; the only question is whether anything will
+ever clean it up."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(preview-tab-test-open-then-fail)))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (should-error (preview-tab-test-open-then-fail "a.txt"))
+      (preview-tab-test--settle)
+      (should (preview-tab-test--preview-p "a.txt")))))
 
 
 ;;;; Nesting
