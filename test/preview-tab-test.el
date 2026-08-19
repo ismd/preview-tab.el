@@ -14,6 +14,8 @@
 ;;; Code:
 
 (require 'ert)
+(require 'dired)
+(require 'grep)
 (require 'preview-tab)
 
 (defvar preview-tab-test--dir nil
@@ -57,6 +59,24 @@ Models a command that gets as far as the file and then trips over something
   "Return non-nil if scratch file NAME is currently the preview buffer."
   (let ((buf (get-file-buffer (preview-tab-test--file name))))
     (and buf (buffer-live-p buf) (preview-tab-buffer-p buf))))
+
+(defun preview-tab-test--grep-buffer ()
+  "Return a grep buffer listing one hit in \"a.txt\" and one in \"b.txt\".
+Written out by hand rather than by running grep(1): no subprocess to wait
+on, no dependency on the binary, and the same path through `compilation-mode'
+either way."
+  (with-current-buffer (get-buffer-create "*preview-tab-test-grep*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert "-*- mode: grep; default-directory: \""
+              preview-tab-test--dir "/\" -*-\n"
+              "Grep started\n\n"
+              (preview-tab-test--file "a.txt") ":1:a\n"
+              (preview-tab-test--file "b.txt") ":1:b\n"
+              "\nGrep finished\n"))
+    (grep-mode)
+    (goto-char (point-min))
+    (current-buffer)))
 
 (defmacro preview-tab-test--with-env (&rest body)
   "Run BODY with `preview-tab-mode' on and a directory of scratch files.
@@ -144,6 +164,52 @@ Restores global state and deletes the scratch files afterwards."
     (preview-tab-test-open "b.txt")
     (preview-tab-test--settle)
     (should (preview-tab-test--live-p "a.txt"))))
+
+
+;;;; The real entry points
+;;
+;; Everything else here drives a stand-in command.  These two drive the actual
+;; defaults, so that the integration itself is covered and not just the
+;; bookkeeping around it.
+
+(ert-deftest preview-tab-test-dired-find-file-previews ()
+  "`dired-find-file', the flagship entry point, really does preview."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(dired-find-file))
+          (dired nil))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (unwind-protect
+          (progn
+            (setq dired (dired-noselect preview-tab-test--dir))
+            (switch-to-buffer dired)
+            (goto-char (point-min))
+            (should (re-search-forward "a\\.txt" nil t))
+            (dired-find-file)
+            (preview-tab-test--settle)
+            (should (preview-tab-test--preview-p "a.txt")))
+        (when dired (kill-buffer dired))))))
+
+(ert-deftest preview-tab-test-next-error-previews-each-hit ()
+  "Walking search results previews each file and lets go of the last."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(next-error))
+          (grep nil))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (unwind-protect
+          (progn
+            (setq grep (preview-tab-test--grep-buffer))
+            (switch-to-buffer grep)
+            (next-error)
+            (preview-tab-test--settle)
+            (should (preview-tab-test--preview-p "a.txt"))
+            (switch-to-buffer grep)
+            (next-error)
+            (preview-tab-test--settle)
+            (should (preview-tab-test--preview-p "b.txt"))
+            (should-not (preview-tab-test--live-p "a.txt")))
+        (when grep (kill-buffer grep))))))
 
 
 ;;;; What must never be touched
