@@ -34,7 +34,9 @@ It stops being a preview — permanently — when you:
 
 The preview is killed when the next preview takes its place, *unless* it is
 modified, visible in another window, or running a process. Those are never
-killed.
+killed — they quietly become ordinary buffers instead. Only one preview is
+tracked at a time, so a buffer nothing will ever come back for must not be
+left pretending to be one.
 
 Two things deliberately do **not** happen, both matching VS Code:
 

@@ -41,7 +41,7 @@
 ;; into an ordinary buffer as soon as you edit it or run `preview-tab-keep'.
 ;; A buffer that was already open is never demoted to a preview, and a preview
 ;; that is modified, visible in another window, or running a process is never
-;; killed.
+;; killed -- it becomes an ordinary buffer instead.
 ;;
 ;; Two commands are provided beyond the mode itself:
 ;;
@@ -268,11 +268,18 @@ BUFFER defaults to the current buffer.  Also used as a buffer-local
        (not (get-buffer-window buffer t))
        (not (get-buffer-process buffer))))
 
-(defun preview-tab--reap (buffer)
-  "Kill BUFFER if it is still an unwanted preview."
-  (when (preview-tab--disposable-p buffer)
-    (let ((kill-buffer-query-functions nil))
-      (kill-buffer buffer))))
+(defun preview-tab--retire (buffer)
+  "Kill BUFFER if it is a disposable preview, otherwise keep it for good.
+A preview that survives -- visible elsewhere, modified, or running a
+process -- must not stay marked as one.  Only one preview is tracked at a
+time, so once the next one takes over nothing would ever come back for
+this buffer: it would sit there italicised and flagged forever, never
+killed and never kept."
+  (when (buffer-live-p buffer)
+    (if (preview-tab--disposable-p buffer)
+        (let ((kill-buffer-query-functions nil))
+          (kill-buffer buffer))
+      (preview-tab--promote buffer))))
 
 (defun preview-tab--mark (buffer)
   "Make BUFFER the preview buffer, retiring the previous one."
@@ -288,8 +295,8 @@ BUFFER defaults to the current buffer.  Also used as a buffer-local
       (force-mode-line-update))
     (when (and old (not (eq old buffer)))
       ;; The old preview is still on screen right now; let redisplay swap it out
-      ;; before deciding whether it is safe to kill.
-      (run-at-time 0 nil #'preview-tab--reap old))))
+      ;; before deciding what to do with it.
+      (run-at-time 0 nil #'preview-tab--retire old))))
 
 (defun preview-tab--call (fn &rest args)
   "Apply FN to ARGS, then treat any file it opened as the preview buffer.

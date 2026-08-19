@@ -159,6 +159,32 @@ open."
             (should (preview-tab-test--live-p "a.txt")))
         (delete-window window)))))
 
+(ert-deftest preview-tab-test-unkillable-preview-is-promoted ()
+  "A preview that cannot be killed stops being a preview instead.
+Only one preview is tracked, so once the next one takes over nothing would
+ever come back for this buffer.  Leaving it flagged would strand it:
+italicised and marked forever, never killed and never kept."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (let ((window (split-window))
+          (buffer (get-file-buffer (preview-tab-test--file "a.txt"))))
+      (unwind-protect
+          (progn
+            (set-window-buffer window buffer)
+            (preview-tab-test-open "b.txt")
+            (preview-tab-test--settle)
+            (should (buffer-live-p buffer))
+            (should-not (preview-tab-buffer-p buffer))
+            (with-current-buffer buffer
+              (should-not preview-tab--face-cookies)
+              (should-not (assq 'mode-line-buffer-id face-remapping-alist))))
+        (delete-window window))
+      ;; Now an ordinary buffer, so later previews leave it alone.
+      (preview-tab-test-open "c.txt")
+      (preview-tab-test--settle)
+      (should (buffer-live-p buffer)))))
+
 (ert-deftest preview-tab-test-modified-preview-is-not-killed ()
   "A modified preview survives even if promotion never happened."
   (preview-tab-test--with-env
