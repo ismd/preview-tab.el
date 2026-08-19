@@ -336,13 +336,26 @@ KNOWN is the `buffer-list' from before the command ran."
      ;; already open, and stays permanent.
      ((eq shown preview-tab-buffer) (preview-tab--mark shown)))))
 
-(defun preview-tab--call (fn &rest args)
+(defun preview-tab--invoke (fn args interactive)
+  "Apply FN to ARGS, as an interactive call when INTERACTIVE.
+`:around' advice sits between `call-interactively' and the command, and
+`called-interactively-p' cannot see past it.  Commands that ask -- to decide
+whether to message, or how much to prompt for -- would otherwise quietly
+behave as though they had been called from Lisp."
+  (if interactive
+      (apply #'funcall-interactively fn args)
+    (apply fn args)))
+
+(defun preview-tab--call (fn args &optional interactive)
   "Apply FN to ARGS, then treat any file it opened as the preview buffer.
+INTERACTIVE says the call came from `call-interactively'; see
+`preview-tab--invoke'.
+
 Reached through `preview-tab--advice' for `preview-tab-commands', and
 directly from `preview-tab-find-file', which previews on request whether
 or not the mode is on."
   (if preview-tab--busy
-      (apply fn args)
+      (preview-tab--invoke fn args interactive)
     (let ((known (buffer-list))
           (preview-tab--busy t))
       ;; `unwind-protect', not `prog1'.  A command that reaches the file and
@@ -350,7 +363,7 @@ or not the mode is on."
       ;; would otherwise leave the buffer open and tracked by nobody, which is
       ;; the one outcome this package exists to avoid.
       (unwind-protect
-          (apply fn args)
+          (preview-tab--invoke fn args interactive)
         (preview-tab--adopt known)))))
 
 (defun preview-tab--advice (fn &rest args)
@@ -359,9 +372,11 @@ Applies FN to ARGS untouched while the mode is off.  The mode is the single
 source of truth: advice that outlives it -- attached by hand, or resolved
 late on a command whose package had not loaded yet -- must not go on marking
 and killing buffers behind the user's back."
-  (if preview-tab-mode
-      (apply #'preview-tab--call fn args)
-    (apply fn args)))
+  ;; Read it here, in the frame `call-interactively' actually entered.
+  (let ((interactive (called-interactively-p 'any)))
+    (if preview-tab-mode
+        (preview-tab--call fn args interactive)
+      (preview-tab--invoke fn args interactive))))
 
 
 ;;;; Commands
@@ -374,7 +389,7 @@ deliberate \"just let me look at it\" counterpart.  FILENAME and WILDCARDS
 are read exactly as `find-file' reads them."
   (interactive (find-file-read-args "Preview file: "
                                     (confirm-nonexistent-file-or-buffer)))
-  (preview-tab--call #'find-file filename wildcards))
+  (preview-tab--call #'find-file (list filename wildcards)))
 
 ;;;###autoload
 (defun preview-tab-keep ()
