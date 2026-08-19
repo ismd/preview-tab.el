@@ -143,7 +143,6 @@ variable."
     consult-ripgrep
     consult-grep
     consult-git-grep
-    consult-line
     consult-flymake)
   "Commands whose file visits are treated as temporary previews.
 
