@@ -383,12 +383,20 @@ permanent."
         (setq preview-tab--advised (copy-sequence preview-tab-commands))
         (dolist (cmd preview-tab--advised)
           (advice-add cmd :around #'preview-tab--advice))
-        (add-to-list 'mode-line-misc-info preview-tab--mode-line-entry t))
+        ;; Not `add-to-list' and `setq': `mode-line-misc-info' can be
+        ;; buffer-local, and those would then edit whichever buffer happened to
+        ;; be current instead of the value every buffer inherits.
+        (unless (member preview-tab--mode-line-entry
+                        (default-value 'mode-line-misc-info))
+          (setq-default mode-line-misc-info
+                        (append (default-value 'mode-line-misc-info)
+                                (list preview-tab--mode-line-entry)))))
     (dolist (cmd preview-tab--advised)
       (advice-remove cmd #'preview-tab--advice))
     (setq preview-tab--advised nil)
-    (setq mode-line-misc-info
-          (delete preview-tab--mode-line-entry mode-line-misc-info))
+    (setq-default mode-line-misc-info
+                  (remove preview-tab--mode-line-entry
+                          (default-value 'mode-line-misc-info)))
     (dolist (buf (buffer-list))
       (preview-tab--promote buf))))
 

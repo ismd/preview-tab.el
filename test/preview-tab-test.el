@@ -280,6 +280,22 @@ italicised and marked forever, never killed and never kept."
       (preview-tab-mode -1))
     (should-not (member preview-tab--mode-line-entry mode-line-misc-info))))
 
+(ert-deftest preview-tab-test-mode-line-entry-is-global ()
+  "The entry lands on the global value, whichever buffer toggles the mode.
+`preview-tab-mode' is global, but `mode-line-misc-info' can be buffer-local,
+and `add-to-list' would quietly have edited that local copy instead -- the
+marker would then show in one buffer and nowhere else."
+  (let ((preview-tab-commands nil))
+    (with-temp-buffer
+      (setq-local mode-line-misc-info (copy-sequence mode-line-misc-info))
+      (preview-tab-mode 1)
+      (unwind-protect
+          (should (member preview-tab--mode-line-entry
+                          (default-value 'mode-line-misc-info)))
+        (preview-tab-mode -1))
+      (should-not (member preview-tab--mode-line-entry
+                          (default-value 'mode-line-misc-info))))))
+
 (ert-deftest preview-tab-test-indicator-falls-back-to-the-label ()
   "Without `nerd-icons', `auto' renders the text label."
   (skip-unless (not (fboundp 'nerd-icons-mdicon)))
