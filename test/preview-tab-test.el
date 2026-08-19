@@ -30,6 +30,13 @@
   (interactive "sFile: ")
   (switch-to-buffer (find-file-noselect (preview-tab-test--file name))))
 
+(defun preview-tab-test-open-nested (name)
+  "Stand-in command reaching scratch file NAME through another command.
+Models the real nesting -- `compile-goto-error' calling `next-error' --
+where both ends are advised."
+  (interactive "sFile: ")
+  (preview-tab-test-open name))
+
 (defun preview-tab-test-open-with-company (name)
   "Stand-in command: show scratch file NAME, and read \"e.txt\" on the side.
 Models a command whose hooks or backend visit a file of their own while
@@ -327,8 +334,6 @@ ever clean it up."
 (ert-deftest preview-tab-test-nested-commands-adopt-once ()
   "When advised commands nest, the outermost one decides."
   (preview-tab-test--with-env
-    (defalias 'preview-tab-test-open-nested
-      (lambda (name) (preview-tab-test-open name)))
     (unwind-protect
         (progn
           (advice-add 'preview-tab-test-open-nested :around #'preview-tab--advice)
@@ -338,8 +343,7 @@ ever clean it up."
           (preview-tab-test--settle)
           (should (preview-tab-test--preview-p "b.txt"))
           (should-not (preview-tab-test--live-p "a.txt")))
-      (advice-remove 'preview-tab-test-open-nested #'preview-tab--advice)
-      (fmakunbound 'preview-tab-test-open-nested))))
+      (advice-remove 'preview-tab-test-open-nested #'preview-tab--advice))))
 
 
 ;;;; preview-tab-find-file

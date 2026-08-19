@@ -11,12 +11,14 @@ LOAD := -L . -L test $(if $(NERD_ICONS),-L $(NERD_ICONS))
 
 all: compile lint test test-tty
 
-## Byte-compile, treating every warning as an error.
+## Byte-compile, treating every warning as an error.  The tests go through it
+## too -- a warning there is just as much a signal, and nothing else would ever
+## surface it.
 compile:
 	$(EMACS) -Q --batch $(LOAD) \
 	  --eval '(setq byte-compile-error-on-warn t)' \
-	  -f batch-byte-compile $(MAIN)
-	@rm -f $(PACKAGE).elc
+	  -f batch-byte-compile $(MAIN) $(wildcard test/*.el)
+	@rm -f $(PACKAGE).elc test/*.elc
 
 $(ELPA):
 	$(EMACS) -Q --batch --eval '(progn (setq package-user-dir (expand-file-name "$(ELPA)")) (require (quote package)) (add-to-list (quote package-archives) (cons "melpa" "https://melpa.org/packages/") t) (package-initialize) (package-refresh-contents) (package-install (quote package-lint)))'
