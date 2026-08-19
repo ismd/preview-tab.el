@@ -1,0 +1,4 @@
+*.elc
+/.elpa/
+/checkdoc.log
+/tty-test.log

@@ -1,0 +1,42 @@
+---
+
+# melpazoid <https://github.com/riscy/melpazoid> build checks.
+#
+# Runs the same checks MELPA applies to a submitted recipe, so the package
+# stays submission-ready.  Set EXIST_OK to true once preview-tab is on MELPA.
+
+name: melpazoid
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          sudo apt-get install emacs && emacs --version
+          git clone https://github.com/riscy/melpazoid.git ~/melpazoid
+          pip install ~/melpazoid
+
+      - name: Run
+        env:
+          LOCAL_REPO: ${{ github.workspace }}
+          RECIPE: >-
+            (preview-tab :fetcher github :repo "ismd/preview-tab.el"
+             :branch "${{ github.ref_name }}" :files ("preview-tab.el"))
+          EXIST_OK: false
+        run: make -C ~/melpazoid
