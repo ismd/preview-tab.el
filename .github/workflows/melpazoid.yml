@@ -14,6 +14,9 @@ on:  # yamllint disable-line rule:truthy
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
