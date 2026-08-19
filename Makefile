@@ -42,15 +42,26 @@ test:
 ## Frame-dependent suite.  Batch Emacs has no frame, so `format-mode-line'
 ## returns "" for every input there; these tests run on a terminal frame under
 ## a pty instead.
+## TERM matters: CI runners hand us `dumb', and `emacs -nw' refuses to start on
+## a terminal it cannot position the cursor on.  The typescript is kept rather
+## than discarded, so a failure to even reach Emacs is visible.
+TTY_TERM ?= xterm
+
 test-tty:
-	@rm -f tty-test.log
-	@TTY_TEST_LOG=tty-test.log script -qec \
-	  "TTY_TEST_LOG=tty-test.log $(EMACS) -Q -nw $(LOAD) -l test/run-tty.el" \
-	  /dev/null > /dev/null; \
+	@rm -f tty-test.log typescript.log
+	@TERM=$(TTY_TERM) script -qec \
+	  "TERM=$(TTY_TERM) TTY_TEST_LOG=tty-test.log $(EMACS) -Q -nw $(LOAD) -l test/run-tty.el" \
+	  typescript.log > /dev/null; \
 	  status=$$?; \
-	  [ -f tty-test.log ] && sed -n '/^Running/,$$p' tty-test.log; \
+	  if [ -f tty-test.log ]; then \
+	    sed -n '/^Running/,$$p' tty-test.log; \
+	  else \
+	    echo "test-tty: Emacs never produced a log; the raw session follows:"; \
+	    cat typescript.log; \
+	    [ $$status -eq 0 ] && status=1; \
+	  fi; \
 	  exit $$status
 
 clean:
-	rm -f *.elc test/*.elc checkdoc.log tty-test.log
+	rm -f *.elc test/*.elc checkdoc.log tty-test.log typescript.log
 	rm -rf $(ELPA)
