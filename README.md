@@ -47,14 +47,16 @@ Two things deliberately do **not** happen, both matching VS Code:
 
 `find-file` is **not** a preview source. Typing a file name is a deliberate act,
 and VS Code does not preview from Quick Open either. When you do want to just
-peek at a named file, use `preview-tab-find-file`.
+peek at a named file, use `preview-tab-find-file` — though if the file is
+already open it stays as it is, since nothing here demotes a buffer you
+already have.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `preview-tab-mode` | Turn the whole thing on or off. Turning it off makes every preview permanent. |
-| `preview-tab-find-file` | Visit a file as a preview — the "just let me look at it" counterpart to `find-file`. |
+| `preview-tab-find-file` | Visit a file as a preview — the "just let me look at it" counterpart to `find-file`. Files already open are left alone. |
 | `preview-tab-keep` | Keep the current preview buffer for good. |
 
 Suggested bindings:

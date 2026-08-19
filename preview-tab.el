@@ -45,9 +45,9 @@
 ;;
 ;; Two commands are provided beyond the mode itself:
 ;;
-;;   `preview-tab-find-file'  visit a file as a preview, whatever the usual
-;;                            behaviour would be -- the deliberate "just let me
-;;                            look at it" counterpart to `find-file'
+;;   `preview-tab-find-file'  visit a file as a preview instead of for good --
+;;                            the deliberate "just let me look at it"
+;;                            counterpart to `find-file'
 ;;   `preview-tab-keep'       keep the current preview buffer for good
 ;;
 ;; The current preview is marked in the mode line: the buffer path is italicised
@@ -387,10 +387,14 @@ and killing buffers behind the user's back."
 
 ;;;###autoload
 (defun preview-tab-find-file (filename &optional wildcards)
-  "Visit FILENAME as a preview, whatever the usual behaviour would be.
-Ordinary `find-file' opens a file for good, as in VS Code; this is the
+  "Visit FILENAME as a preview instead of for good.
+Ordinary `find-file' opens a file to keep, as in VS Code; this is the
 deliberate \"just let me look at it\" counterpart.  FILENAME and WILDCARDS
-are read exactly as `find-file' reads them."
+are read exactly as `find-file' reads them.
+
+A file that is already open keeps the standing it has.  Like the browsing
+commands, this never demotes a buffer you have got open to a preview, which
+would put a buffer you deliberately kept in line to be killed."
   (interactive (find-file-read-args "Preview file: "
                                     (confirm-nonexistent-file-or-buffer)))
   (preview-tab--call #'find-file (list filename wildcards)))
