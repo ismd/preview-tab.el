@@ -34,7 +34,15 @@ It stops being a preview — permanently — when you:
 
 The preview is killed when the next preview takes its place, *unless* it is
 modified, visible in another window, or running a process. Those are never
-killed.
+killed — they quietly become ordinary buffers instead. Only one preview is
+tracked at a time, so a buffer nothing will ever come back for must not be
+left pretending to be one.
+
+The kill itself goes ahead without consulting the global
+`kill-buffer-query-functions`: it happens on a timer, where a prompt would
+come out of nowhere, and the grounds those usually object on are the ones
+already checked above. A buffer-local one still gets the last word, and a
+buffer it saves becomes ordinary like any other survivor.
 
 Two things deliberately do **not** happen, both matching VS Code:
 
@@ -45,14 +53,16 @@ Two things deliberately do **not** happen, both matching VS Code:
 
 `find-file` is **not** a preview source. Typing a file name is a deliberate act,
 and VS Code does not preview from Quick Open either. When you do want to just
-peek at a named file, use `preview-tab-find-file`.
+peek at a named file, use `preview-tab-find-file` — though if the file is
+already open it stays as it is, since nothing here demotes a buffer you
+already have.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `preview-tab-mode` | Turn the whole thing on or off. Turning it off makes every preview permanent. |
-| `preview-tab-find-file` | Visit a file as a preview — the "just let me look at it" counterpart to `find-file`. |
+| `preview-tab-find-file` | Visit a file as a preview — the "just let me look at it" counterpart to `find-file`. Files already open are left alone. |
 | `preview-tab-keep` | Keep the current preview buffer for good. |
 
 Suggested bindings:
@@ -104,11 +114,30 @@ There are no dependencies beyond Emacs 27.1.
 
 Listing a command from a package you have not installed is harmless — the
 advice attaches to the bare symbol and only ever fires if that package loads.
-So you can add things freely:
+So you can add things freely — as long as you do it before turning the mode
+on:
 
 ```elisp
 (add-to-list 'preview-tab-commands #'my-jump-to-thing)
+(preview-tab-mode 1)
 ```
+
+Afterwards the advice is already attached to whatever the list held at the
+time, and `add-to-list` won't reattach it. Go through the customize machinery
+instead, which will:
+
+```elisp
+(setopt preview-tab-commands (cons #'my-jump-to-thing preview-tab-commands))
+
+;; before Emacs 29:
+(customize-set-variable 'preview-tab-commands
+                        (cons #'my-jump-to-thing preview-tab-commands))
+```
+
+One limit worth knowing: only files opened while the command itself runs are
+picked up. A command that hands the visit off to a timer, a process filter or
+`post-command-hook` has already returned by the time the file appears, and its
+buffer stays an ordinary one.
 
 ### The mode-line marker
 
@@ -179,6 +208,10 @@ input — a batch test asserting on rendered mode-line text passes or fails for
 reasons unrelated to the code. Those tests run on a terminal frame under a pty
 instead, via `script(1)`. `preview-tab-tty-test-frame-can-render-a-mode-line`
 guards the file: it fails under `--batch`, proving the suite is not vacuous.
+
+`make test-tty` wants the util-linux `script`. BSD and macOS ship a different
+program under that name, taking different arguments; the target checks for it
+up front and says so rather than failing obscurely halfway through.
 
 To exercise the icon tests, point `make` at a `nerd-icons` checkout:
 

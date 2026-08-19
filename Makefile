@@ -3,26 +3,45 @@ PACKAGE := preview-tab
 MAIN    := $(PACKAGE).el
 ELPA    := .elpa
 
-# Point NERD_ICONS at a nerd-icons checkout to exercise the icon tests:
-#   make test-tty NERD_ICONS=~/.emacs.d/elpa/nerd-icons
-LOAD := -L . -L test $(if $(NERD_ICONS),-L $(NERD_ICONS))
+LOAD := -L . -L test
 
-.PHONY: all compile lint test test-tty clean
+# The icon tests skip themselves unless nerd-icons is on the load path, and
+# skipping is not passing: without it nothing checks that a bad icon name stays
+# quiet inside redisplay.  `make deps' puts a copy under $(ELPA) and test-tty
+# finds it there; set NERD_ICONS to use a checkout you already have instead:
+#   make test-tty NERD_ICONS=~/.emacs.d/elpa/nerd-icons
+NERD_ICONS ?=
+
+.PHONY: all compile deps lint test test-tty clean
 
 all: compile lint test test-tty
 
-## Byte-compile, treating every warning as an error.
+## Byte-compile, treating every warning as an error.  The tests go through it
+## too -- a warning there is just as much a signal, and nothing else would ever
+## surface it.
 compile:
 	$(EMACS) -Q --batch $(LOAD) \
 	  --eval '(setq byte-compile-error-on-warn t)' \
-	  -f batch-byte-compile $(MAIN)
-	@rm -f $(PACKAGE).elc
+	  -f batch-byte-compile $(MAIN) $(wildcard test/*.el)
+	@rm -f $(PACKAGE).elc test/*.elc
 
-$(ELPA):
-	$(EMACS) -Q --batch --eval '(progn (setq package-user-dir (expand-file-name "$(ELPA)")) (require (quote package)) (add-to-list (quote package-archives) (cons "melpa" "https://melpa.org/packages/") t) (package-initialize) (package-refresh-contents) (package-install (quote package-lint)))'
+# Packages needed to develop on preview-tab, never to use it.  They live under
+# $(ELPA) so they cannot be confused with the user's own.
+DEPS := package-lint nerd-icons
+
+## Install whatever in DEPS is missing, and nothing else.  Depending on the
+## $(ELPA) directory instead would go by whether it exists, which says nothing
+## about what is in it -- and would touch the network on every clean build.
+deps:
+	@$(EMACS) -Q --batch \
+	  --eval '(setq package-user-dir (expand-file-name "$(ELPA)"))' \
+	  --eval '(require (quote package))' \
+	  --eval '(add-to-list (quote package-archives) (cons "melpa" "https://melpa.org/packages/") t)' \
+	  -f package-initialize \
+	  --eval '(let ((missing (delq nil (mapcar (lambda (p) (unless (package-installed-p p) p)) (quote ($(DEPS))))))) (when missing (package-refresh-contents) (mapc (function package-install) missing)))'
 
 ## MELPA readiness: package metadata and docstring conventions.
-lint: $(ELPA)
+lint: deps
 	$(EMACS) -Q --batch \
 	  --eval '(setq package-user-dir (expand-file-name "$(ELPA)"))' \
 	  -f package-initialize -l package-lint $(LOAD) \
@@ -48,9 +67,19 @@ test:
 TTY_TERM ?= xterm
 
 test-tty:
+	@command -v script >/dev/null 2>&1 || { \
+	  echo "test-tty: script(1) not found; on Linux it comes with util-linux."; \
+	  exit 1; }
+	@script -qec true /dev/null >/dev/null 2>&1 || { \
+	  echo "test-tty: this script(1) does not understand -qec."; \
+	  echo "          The suite needs the util-linux one; BSD and macOS ship a"; \
+	  echo "          different program under the same name."; \
+	  exit 1; }
 	@rm -f tty-test.log typescript.log
-	@TERM=$(TTY_TERM) script -qec \
-	  "TERM=$(TTY_TERM) TTY_TEST_LOG=tty-test.log $(EMACS) -Q -nw $(LOAD) -l test/run-tty.el" \
+	@icons="$(NERD_ICONS)"; \
+	  [ -n "$$icons" ] || icons=$$(ls -d $(ELPA)/nerd-icons-*/ 2>/dev/null | head -1); \
+	  TERM=$(TTY_TERM) script -qec \
+	  "TERM=$(TTY_TERM) TTY_TEST_LOG=tty-test.log $(EMACS) -Q -nw $(LOAD) $${icons:+-L $$icons} -l test/run-tty.el" \
 	  typescript.log > /dev/null; \
 	  status=$$?; \
 	  if [ -f tty-test.log ]; then \

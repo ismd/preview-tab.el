@@ -14,6 +14,8 @@
 ;;; Code:
 
 (require 'ert)
+(require 'dired)
+(require 'grep)
 (require 'preview-tab)
 
 (defvar preview-tab-test--dir nil
@@ -28,6 +30,29 @@
   (interactive "sFile: ")
   (switch-to-buffer (find-file-noselect (preview-tab-test--file name))))
 
+(defun preview-tab-test-open-nested (name)
+  "Stand-in command reaching scratch file NAME through another command.
+Models the real nesting -- `compile-goto-error' calling `next-error' --
+where both ends are advised."
+  (interactive "sFile: ")
+  (preview-tab-test-open name))
+
+(defun preview-tab-test-open-with-company (name)
+  "Stand-in command: show scratch file NAME, and read \"e.txt\" on the side.
+Models a command whose hooks or backend visit a file of their own while
+they are at it."
+  (interactive "sFile: ")
+  (find-file-noselect (preview-tab-test--file "e.txt"))
+  (display-buffer (find-file-noselect (preview-tab-test--file name))))
+
+(defun preview-tab-test-open-then-fail (name)
+  "Stand-in command: visit scratch file NAME, then signal.
+Models a command that gets as far as the file and then trips over something
+-- a stale location, a hook that errors."
+  (interactive "sFile: ")
+  (preview-tab-test-open name)
+  (error "Nothing further to see here"))
+
 (defun preview-tab-test--settle ()
   "Let the zero-delay reap timer run."
   (dotimes (_ 5) (sit-for 0.02)))
@@ -41,6 +66,24 @@
   "Return non-nil if scratch file NAME is currently the preview buffer."
   (let ((buf (get-file-buffer (preview-tab-test--file name))))
     (and buf (buffer-live-p buf) (preview-tab-buffer-p buf))))
+
+(defun preview-tab-test--grep-buffer ()
+  "Return a grep buffer listing one hit in \"a.txt\" and one in \"b.txt\".
+Written out by hand rather than by running grep(1): no subprocess to wait
+on, no dependency on the binary, and the same path through `compilation-mode'
+either way."
+  (with-current-buffer (get-buffer-create "*preview-tab-test-grep*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert "-*- mode: grep; default-directory: \""
+              preview-tab-test--dir "/\" -*-\n"
+              "Grep started\n\n"
+              (preview-tab-test--file "a.txt") ":1:a\n"
+              (preview-tab-test--file "b.txt") ":1:b\n"
+              "\nGrep finished\n"))
+    (grep-mode)
+    (goto-char (point-min))
+    (current-buffer)))
 
 (defmacro preview-tab-test--with-env (&rest body)
   "Run BODY with `preview-tab-mode' on and a directory of scratch files.
@@ -109,6 +152,14 @@ Restores global state and deletes the scratch files afterwards."
     (preview-tab-test--settle)
     (should (preview-tab-test--live-p "a.txt"))))
 
+(ert-deftest preview-tab-test-killing-the-preview-clears-the-pointer ()
+  "Killing a preview by hand must not leave a dead buffer pinned."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (kill-buffer (get-file-buffer (preview-tab-test--file "a.txt")))
+    (should-not preview-tab-buffer)))
+
 (ert-deftest preview-tab-test-keep-promotes ()
   "`preview-tab-keep' spares the buffer from the next preview."
   (preview-tab-test--with-env
@@ -120,6 +171,52 @@ Restores global state and deletes the scratch files afterwards."
     (preview-tab-test-open "b.txt")
     (preview-tab-test--settle)
     (should (preview-tab-test--live-p "a.txt"))))
+
+
+;;;; The real entry points
+;;
+;; Everything else here drives a stand-in command.  These two drive the actual
+;; defaults, so that the integration itself is covered and not just the
+;; bookkeeping around it.
+
+(ert-deftest preview-tab-test-dired-find-file-previews ()
+  "`dired-find-file', the flagship entry point, really does preview."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(dired-find-file))
+          (dired nil))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (unwind-protect
+          (progn
+            (setq dired (dired-noselect preview-tab-test--dir))
+            (switch-to-buffer dired)
+            (goto-char (point-min))
+            (should (re-search-forward "a\\.txt" nil t))
+            (dired-find-file)
+            (preview-tab-test--settle)
+            (should (preview-tab-test--preview-p "a.txt")))
+        (when dired (kill-buffer dired))))))
+
+(ert-deftest preview-tab-test-next-error-previews-each-hit ()
+  "Walking search results previews each file and lets go of the last."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(next-error))
+          (grep nil))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (unwind-protect
+          (progn
+            (setq grep (preview-tab-test--grep-buffer))
+            (switch-to-buffer grep)
+            (next-error)
+            (preview-tab-test--settle)
+            (should (preview-tab-test--preview-p "a.txt"))
+            (switch-to-buffer grep)
+            (next-error)
+            (preview-tab-test--settle)
+            (should (preview-tab-test--preview-p "b.txt"))
+            (should-not (preview-tab-test--live-p "a.txt")))
+        (when grep (kill-buffer grep))))))
 
 
 ;;;; What must never be touched
@@ -159,6 +256,53 @@ open."
             (should (preview-tab-test--live-p "a.txt")))
         (delete-window window)))))
 
+(ert-deftest preview-tab-test-unkillable-preview-is-promoted ()
+  "A preview that cannot be killed stops being a preview instead.
+Only one preview is tracked, so once the next one takes over nothing would
+ever come back for this buffer.  Leaving it flagged would strand it:
+italicised and marked forever, never killed and never kept."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (let ((window (split-window))
+          (buffer (get-file-buffer (preview-tab-test--file "a.txt"))))
+      (unwind-protect
+          (progn
+            (set-window-buffer window buffer)
+            (preview-tab-test-open "b.txt")
+            (preview-tab-test--settle)
+            (should (buffer-live-p buffer))
+            (should-not (preview-tab-buffer-p buffer))
+            (with-current-buffer buffer
+              (should-not preview-tab--face-cookies)
+              (should-not (assq 'mode-line-buffer-id face-remapping-alist))))
+        (delete-window window))
+      ;; Now an ordinary buffer, so later previews leave it alone.
+      (preview-tab-test-open "c.txt")
+      (preview-tab-test--settle)
+      (should (buffer-live-p buffer)))))
+
+(ert-deftest preview-tab-test-preview-that-refuses-to-die-is-promoted ()
+  "A preview `kill-buffer' turns down stops being a preview.
+`preview-tab--disposable-p' cannot see a buffer-local
+`kill-buffer-query-functions' -- binding the variable here only reaches the
+global value -- so the kill can still be refused after we have decided to go
+ahead with it."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (let ((buffer (get-file-buffer (preview-tab-test--file "a.txt"))))
+      (with-current-buffer buffer
+        (add-hook 'kill-buffer-query-functions #'ignore nil t))
+      (unwind-protect
+          (progn
+            (preview-tab-test-open "b.txt")
+            (preview-tab-test--settle)
+            (should (buffer-live-p buffer))
+            (should-not (preview-tab-buffer-p buffer)))
+        (with-current-buffer buffer
+          (remove-hook 'kill-buffer-query-functions #'ignore t))))))
+
 (ert-deftest preview-tab-test-modified-preview-is-not-killed ()
   "A modified preview survives even if promotion never happened."
   (preview-tab-test--with-env
@@ -176,24 +320,51 @@ open."
       (set-buffer-modified-p nil))))
 
 
+;;;; Picking the right buffer
+
+(ert-deftest preview-tab-test-adopts-the-buffer-that-is-shown ()
+  "When a command opens several files, the one on screen is the preview.
+Taking the most recent new buffer instead picks up whatever the command
+happened to read on the side."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(preview-tab-test-open-with-company)))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (save-window-excursion
+        (preview-tab-test-open-with-company "a.txt")
+        (preview-tab-test--settle))
+      (should (preview-tab-test--preview-p "a.txt"))
+      (should-not (preview-tab-test--preview-p "e.txt")))))
+
+
+(ert-deftest preview-tab-test-failing-command-still-adopts ()
+  "A command that visits the file and then signals leaves a preview, not a leak.
+The buffer is open either way; the only question is whether anything will
+ever clean it up."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(preview-tab-test-open-then-fail)))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (should-error (preview-tab-test-open-then-fail "a.txt"))
+      (preview-tab-test--settle)
+      (should (preview-tab-test--preview-p "a.txt")))))
+
+
 ;;;; Nesting
 
 (ert-deftest preview-tab-test-nested-commands-adopt-once ()
   "When advised commands nest, the outermost one decides."
   (preview-tab-test--with-env
-    (defalias 'preview-tab-test-open-nested
-      (lambda (name) (preview-tab-test-open name)))
     (unwind-protect
         (progn
-          (advice-add 'preview-tab-test-open-nested :around #'preview-tab--call)
+          (advice-add 'preview-tab-test-open-nested :around #'preview-tab--advice)
           (preview-tab-test-open "a.txt")
           (preview-tab-test--settle)
           (preview-tab-test-open-nested "b.txt")
           (preview-tab-test--settle)
           (should (preview-tab-test--preview-p "b.txt"))
           (should-not (preview-tab-test--live-p "a.txt")))
-      (advice-remove 'preview-tab-test-open-nested #'preview-tab--call)
-      (fmakunbound 'preview-tab-test-open-nested))))
+      (advice-remove 'preview-tab-test-open-nested #'preview-tab--advice))))
 
 
 ;;;; preview-tab-find-file
@@ -254,6 +425,37 @@ open."
       (preview-tab-mode -1))
     (should-not (member preview-tab--mode-line-entry mode-line-misc-info))))
 
+(ert-deftest preview-tab-test-enabling-twice-changes-nothing ()
+  "Turning the mode on again must not stack advice or mode-line entries.
+Easy to do by accident -- a second `preview-tab-mode' call in a config, a
+reloaded init file -- and it would show as a doubled marker."
+  (preview-tab-test--with-env
+    (preview-tab-mode 1)
+    (preview-tab-mode 1)
+    (let ((advices 0))
+      (advice-mapc (lambda (&rest _) (setq advices (1+ advices)))
+                   'preview-tab-test-open)
+      (should (= 1 advices)))
+    (should (= 1 (seq-count (lambda (entry)
+                              (equal entry preview-tab--mode-line-entry))
+                            (default-value 'mode-line-misc-info))))))
+
+(ert-deftest preview-tab-test-mode-line-entry-is-global ()
+  "The entry lands on the global value, whichever buffer toggles the mode.
+`preview-tab-mode' is global, but `mode-line-misc-info' can be buffer-local,
+and `add-to-list' would quietly have edited that local copy instead -- the
+marker would then show in one buffer and nowhere else."
+  (let ((preview-tab-commands nil))
+    (with-temp-buffer
+      (setq-local mode-line-misc-info (copy-sequence mode-line-misc-info))
+      (preview-tab-mode 1)
+      (unwind-protect
+          (should (member preview-tab--mode-line-entry
+                          (default-value 'mode-line-misc-info)))
+        (preview-tab-mode -1))
+      (should-not (member preview-tab--mode-line-entry
+                          (default-value 'mode-line-misc-info))))))
+
 (ert-deftest preview-tab-test-indicator-falls-back-to-the-label ()
   "Without `nerd-icons', `auto' renders the text label."
   (skip-unless (not (fboundp 'nerd-icons-mdicon)))
@@ -293,7 +495,7 @@ open."
     (preview-tab-mode -1)
     (should-not (preview-tab-test--preview-p "a.txt"))
     (should-not preview-tab-buffer)
-    (should-not (advice-member-p #'preview-tab--call 'preview-tab-test-open))
+    (should-not (advice-member-p #'preview-tab--advice 'preview-tab-test-open))
     ;; With the mode off, browsing kills nothing.
     (preview-tab-test-open "b.txt")
     (preview-tab-test--settle)
@@ -301,6 +503,34 @@ open."
     (preview-tab-test--settle)
     (should (preview-tab-test--live-p "b.txt"))
     (preview-tab-mode 1)))
+
+(ert-deftest preview-tab-test-mode-off-unadvises-what-it-advised ()
+  "Turning the mode off undoes exactly what turning it on did.
+`preview-tab-commands' may have been changed in between -- with plain `setq',
+which no setter sees -- and the commands that left it must not keep the
+advice."
+  (preview-tab-test--with-env
+    (setq preview-tab-commands nil)
+    (preview-tab-mode -1)
+    (should-not (advice-member-p #'preview-tab--advice 'preview-tab-test-open))))
+
+(ert-deftest preview-tab-test-advice-is-inert-while-the-mode-is-off ()
+  "Advice that outlives the mode must neither preview nor kill.
+The mode is the single source of truth."
+  (preview-tab-test--with-env
+    (preview-tab-mode -1)
+    ;; Put the advice back by hand, exactly as a stale one would sit there.
+    (advice-add 'preview-tab-test-open :around #'preview-tab--advice)
+    (unwind-protect
+        (progn
+          (preview-tab-test-open "a.txt")
+          (preview-tab-test--settle)
+          (should-not (preview-tab-test--preview-p "a.txt"))
+          (should-not preview-tab-buffer)
+          (preview-tab-test-open "b.txt")
+          (preview-tab-test--settle)
+          (should (preview-tab-test--live-p "a.txt")))
+      (advice-remove 'preview-tab-test-open #'preview-tab--advice))))
 
 (provide 'preview-tab-test)
 ;;; preview-tab-test.el ends here

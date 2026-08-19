@@ -31,6 +31,11 @@
   (interactive "sFile: ")
   (switch-to-buffer (find-file-noselect (preview-tab-tty-test--file name))))
 
+(defun preview-tab-tty-test-was-interactive ()
+  "Stand-in command reporting whether it was called interactively."
+  (interactive)
+  (called-interactively-p 'interactive))
+
 (defun preview-tab-tty-test--settle ()
   "Let the zero-delay reap timer run."
   (dotimes (_ 5) (sit-for 0.02)))
@@ -126,6 +131,17 @@
       (preview-tab-tty-test-open "a.txt")
       (preview-tab-tty-test--settle)
       (should (equal "" (preview-tab-tty-test--misc-info))))))
+
+(ert-deftest preview-tab-tty-test-advice-keeps-called-interactively-p ()
+  "An advised command still sees itself as called interactively.
+`:around' advice hides `call-interactively' from `called-interactively-p',
+so a command that asks would quietly change behaviour once it was listed in
+`preview-tab-commands'."
+  (preview-tab-tty-test--with-env
+    (let ((preview-tab-commands '(preview-tab-tty-test-was-interactive)))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (should (call-interactively #'preview-tab-tty-test-was-interactive)))))
 
 (ert-deftest preview-tab-tty-test-find-file-reads-its-argument ()
   "`preview-tab-find-file' works through its interactive spec."
