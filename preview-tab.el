@@ -325,13 +325,17 @@ or not the mode is on."
     (let ((known (buffer-list))
           (preview-tab--busy t))
       (prog1 (apply fn args)
-        ;; `buffer-list' is most-recently-used first, so the first hit is the
-        ;; file the command just visited.
-        (let ((opened (seq-find (lambda (buf)
+        (let* ((new (seq-filter (lambda (buf)
                                   (and (buffer-file-name buf)
                                        (not (memq buf known))))
                                 (buffer-list)))
-              (shown (window-buffer (selected-window))))
+               ;; A command may open more than one file -- a hook reading
+               ;; something, a language server warming up a workspace.  The one
+               ;; on screen is the one that was asked for.  Failing that,
+               ;; `buffer-list' is most-recently-used first, so take the front.
+               (opened (or (seq-find (lambda (buf) (get-buffer-window buf t)) new)
+                           (car new)))
+               (shown (window-buffer (selected-window))))
           (cond
            ;; A file buffer that did not exist before: this is the preview.
            (opened (preview-tab--mark opened))

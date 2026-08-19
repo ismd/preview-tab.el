@@ -28,6 +28,14 @@
   (interactive "sFile: ")
   (switch-to-buffer (find-file-noselect (preview-tab-test--file name))))
 
+(defun preview-tab-test-open-with-company (name)
+  "Stand-in command: show scratch file NAME, and read \"e.txt\" on the side.
+Models a command whose hooks or backend visit a file of their own while
+they are at it."
+  (interactive "sFile: ")
+  (find-file-noselect (preview-tab-test--file "e.txt"))
+  (display-buffer (find-file-noselect (preview-tab-test--file name))))
+
 (defun preview-tab-test--settle ()
   "Let the zero-delay reap timer run."
   (dotimes (_ 5) (sit-for 0.02)))
@@ -208,6 +216,23 @@ italicised and marked forever, never killed and never kept."
     (should (preview-tab-test--live-p "a.txt"))
     (with-current-buffer (get-file-buffer (preview-tab-test--file "a.txt"))
       (set-buffer-modified-p nil))))
+
+
+;;;; Picking the right buffer
+
+(ert-deftest preview-tab-test-adopts-the-buffer-that-is-shown ()
+  "When a command opens several files, the one on screen is the preview.
+Taking the most recent new buffer instead picks up whatever the command
+happened to read on the side."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(preview-tab-test-open-with-company)))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (save-window-excursion
+        (preview-tab-test-open-with-company "a.txt")
+        (preview-tab-test--settle))
+      (should (preview-tab-test--preview-p "a.txt"))
+      (should-not (preview-tab-test--preview-p "e.txt")))))
 
 
 ;;;; Nesting
