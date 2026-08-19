@@ -282,6 +282,27 @@ italicised and marked forever, never killed and never kept."
       (preview-tab-test--settle)
       (should (buffer-live-p buffer)))))
 
+(ert-deftest preview-tab-test-preview-that-refuses-to-die-is-promoted ()
+  "A preview `kill-buffer' turns down stops being a preview.
+`preview-tab--disposable-p' cannot see a buffer-local
+`kill-buffer-query-functions' -- binding the variable here only reaches the
+global value -- so the kill can still be refused after we have decided to go
+ahead with it."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (let ((buffer (get-file-buffer (preview-tab-test--file "a.txt"))))
+      (with-current-buffer buffer
+        (add-hook 'kill-buffer-query-functions #'ignore nil t))
+      (unwind-protect
+          (progn
+            (preview-tab-test-open "b.txt")
+            (preview-tab-test--settle)
+            (should (buffer-live-p buffer))
+            (should-not (preview-tab-buffer-p buffer)))
+        (with-current-buffer buffer
+          (remove-hook 'kill-buffer-query-functions #'ignore t))))))
+
 (ert-deftest preview-tab-test-modified-preview-is-not-killed ()
   "A modified preview survives even if promotion never happened."
   (preview-tab-test--with-env

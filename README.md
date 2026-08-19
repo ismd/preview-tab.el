@@ -38,6 +38,12 @@ killed — they quietly become ordinary buffers instead. Only one preview is
 tracked at a time, so a buffer nothing will ever come back for must not be
 left pretending to be one.
 
+The kill itself goes ahead without consulting the global
+`kill-buffer-query-functions`: it happens on a timer, where a prompt would
+come out of nowhere, and the grounds those usually object on are the ones
+already checked above. A buffer-local one still gets the last word, and a
+buffer it saves becomes ordinary like any other survivor.
+
 Two things deliberately do **not** happen, both matching VS Code:
 
 - A buffer that was already open is never demoted to a preview. Browsing to it

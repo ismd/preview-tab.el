@@ -301,9 +301,16 @@ time, so once the next one takes over nothing would ever come back for
 this buffer: it would sit there italicised and flagged forever, never
 killed and never kept."
   (when (buffer-live-p buffer)
-    (if (preview-tab--disposable-p buffer)
-        (let ((kill-buffer-query-functions nil))
-          (kill-buffer buffer))
+    ;; The global `kill-buffer-query-functions' are suppressed on purpose: this
+    ;; runs from a timer, where a prompt would come out of nowhere, and their
+    ;; usual grounds for objecting -- a live process, unsaved changes -- are
+    ;; already covered above.  A buffer-local one is out of reach of the
+    ;; binding, though, so `kill-buffer' can still turn the kill down after we
+    ;; have decided to go ahead.  Whatever the reason, a buffer that survives
+    ;; must not be left flagged.
+    (unless (and (preview-tab--disposable-p buffer)
+                 (let ((kill-buffer-query-functions nil))
+                   (kill-buffer buffer)))
       (preview-tab--promote buffer))))
 
 (defun preview-tab--mark (buffer)
