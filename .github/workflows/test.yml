@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         emacs_version:
-          - '27.2'   # the floor declared in Package-Requires
+          - '27.1'   # the floor declared in Package-Requires
           - '28.2'
           - '29.4'
           - '30.1'
