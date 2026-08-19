@@ -78,6 +78,13 @@
 Keeps the outermost command in charge when they nest, as when
 `compile-goto-error' calls `next-error'.")
 
+(defvar preview-tab--advised nil
+  "Commands `preview-tab-mode' actually advised when it was turned on.
+Turning the mode off has to undo exactly what turning it on did, and reading
+`preview-tab-commands' a second time would not: nothing stops it from having
+changed in between, and any command dropped from it would keep the advice for
+the rest of the session.")
+
 (defvar preview-tab--indicator-cache nil
   "Rendered mode-line marker.
 `nerd-icons' resolves a name by scanning an alist of several thousand
@@ -300,8 +307,9 @@ killed and never kept."
 
 (defun preview-tab--call (fn &rest args)
   "Apply FN to ARGS, then treat any file it opened as the preview buffer.
-Used both as `:around' advice on `preview-tab-commands' and directly by
-`preview-tab-find-file'."
+Reached through `preview-tab--advice' for `preview-tab-commands', and
+directly from `preview-tab-find-file', which previews on request whether
+or not the mode is on."
   (if preview-tab--busy
       (apply fn args)
     (let ((known (buffer-list))
@@ -320,6 +328,16 @@ Used both as `:around' advice on `preview-tab-commands' and directly by
            ;; Revisiting the current preview keeps it a preview.  Anything else
            ;; was already open, and stays permanent.
            ((eq shown preview-tab-buffer) (preview-tab--mark shown))))))))
+
+(defun preview-tab--advice (fn &rest args)
+  "Around advice on `preview-tab-commands': preview the file FN opens.
+Applies FN to ARGS untouched while the mode is off.  The mode is the single
+source of truth: advice that outlives it -- attached by hand, or resolved
+late on a command whose package had not loaded yet -- must not go on marking
+and killing buffers behind the user's back."
+  (if preview-tab-mode
+      (apply #'preview-tab--call fn args)
+    (apply fn args)))
 
 
 ;;;; Commands
@@ -362,11 +380,13 @@ permanent."
   (setq preview-tab--indicator-cache nil)
   (if preview-tab-mode
       (progn
-        (dolist (cmd preview-tab-commands)
-          (advice-add cmd :around #'preview-tab--call))
+        (setq preview-tab--advised (copy-sequence preview-tab-commands))
+        (dolist (cmd preview-tab--advised)
+          (advice-add cmd :around #'preview-tab--advice))
         (add-to-list 'mode-line-misc-info preview-tab--mode-line-entry t))
-    (dolist (cmd preview-tab-commands)
-      (advice-remove cmd #'preview-tab--call))
+    (dolist (cmd preview-tab--advised)
+      (advice-remove cmd #'preview-tab--advice))
+    (setq preview-tab--advised nil)
     (setq mode-line-misc-info
           (delete preview-tab--mode-line-entry mode-line-misc-info))
     (dolist (buf (buffer-list))

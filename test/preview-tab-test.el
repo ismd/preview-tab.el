@@ -211,14 +211,14 @@ italicised and marked forever, never killed and never kept."
       (lambda (name) (preview-tab-test-open name)))
     (unwind-protect
         (progn
-          (advice-add 'preview-tab-test-open-nested :around #'preview-tab--call)
+          (advice-add 'preview-tab-test-open-nested :around #'preview-tab--advice)
           (preview-tab-test-open "a.txt")
           (preview-tab-test--settle)
           (preview-tab-test-open-nested "b.txt")
           (preview-tab-test--settle)
           (should (preview-tab-test--preview-p "b.txt"))
           (should-not (preview-tab-test--live-p "a.txt")))
-      (advice-remove 'preview-tab-test-open-nested #'preview-tab--call)
+      (advice-remove 'preview-tab-test-open-nested #'preview-tab--advice)
       (fmakunbound 'preview-tab-test-open-nested))))
 
 
@@ -319,7 +319,7 @@ italicised and marked forever, never killed and never kept."
     (preview-tab-mode -1)
     (should-not (preview-tab-test--preview-p "a.txt"))
     (should-not preview-tab-buffer)
-    (should-not (advice-member-p #'preview-tab--call 'preview-tab-test-open))
+    (should-not (advice-member-p #'preview-tab--advice 'preview-tab-test-open))
     ;; With the mode off, browsing kills nothing.
     (preview-tab-test-open "b.txt")
     (preview-tab-test--settle)
@@ -327,6 +327,34 @@ italicised and marked forever, never killed and never kept."
     (preview-tab-test--settle)
     (should (preview-tab-test--live-p "b.txt"))
     (preview-tab-mode 1)))
+
+(ert-deftest preview-tab-test-mode-off-unadvises-what-it-advised ()
+  "Turning the mode off undoes exactly what turning it on did.
+`preview-tab-commands' may have been changed in between -- with plain `setq',
+which no setter sees -- and the commands that left it must not keep the
+advice."
+  (preview-tab-test--with-env
+    (setq preview-tab-commands nil)
+    (preview-tab-mode -1)
+    (should-not (advice-member-p #'preview-tab--advice 'preview-tab-test-open))))
+
+(ert-deftest preview-tab-test-advice-is-inert-while-the-mode-is-off ()
+  "Advice that outlives the mode must neither preview nor kill.
+The mode is the single source of truth."
+  (preview-tab-test--with-env
+    (preview-tab-mode -1)
+    ;; Put the advice back by hand, exactly as a stale one would sit there.
+    (advice-add 'preview-tab-test-open :around #'preview-tab--advice)
+    (unwind-protect
+        (progn
+          (preview-tab-test-open "a.txt")
+          (preview-tab-test--settle)
+          (should-not (preview-tab-test--preview-p "a.txt"))
+          (should-not preview-tab-buffer)
+          (preview-tab-test-open "b.txt")
+          (preview-tab-test--settle)
+          (should (preview-tab-test--live-p "a.txt")))
+      (advice-remove 'preview-tab-test-open #'preview-tab--advice))))
 
 (provide 'preview-tab-test)
 ;;; preview-tab-test.el ends here
