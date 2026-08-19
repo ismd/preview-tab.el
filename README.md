@@ -203,6 +203,10 @@ reasons unrelated to the code. Those tests run on a terminal frame under a pty
 instead, via `script(1)`. `preview-tab-tty-test-frame-can-render-a-mode-line`
 guards the file: it fails under `--batch`, proving the suite is not vacuous.
 
+`make test-tty` wants the util-linux `script`. BSD and macOS ship a different
+program under that name, taking different arguments; the target checks for it
+up front and says so rather than failing obscurely halfway through.
+
 To exercise the icon tests, point `make` at a `nerd-icons` checkout:
 
 ```sh

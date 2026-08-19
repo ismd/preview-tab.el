@@ -62,6 +62,14 @@ test:
 TTY_TERM ?= xterm
 
 test-tty:
+	@command -v script >/dev/null 2>&1 || { \
+	  echo "test-tty: script(1) not found; on Linux it comes with util-linux."; \
+	  exit 1; }
+	@script -qec true /dev/null >/dev/null 2>&1 || { \
+	  echo "test-tty: this script(1) does not understand -qec."; \
+	  echo "          The suite needs the util-linux one; BSD and macOS ship a"; \
+	  echo "          different program under the same name."; \
+	  exit 1; }
 	@rm -f tty-test.log typescript.log
 	@TERM=$(TTY_TERM) script -qec \
 	  "TERM=$(TTY_TERM) TTY_TEST_LOG=tty-test.log $(EMACS) -Q -nw $(LOAD) -l test/run-tty.el" \
