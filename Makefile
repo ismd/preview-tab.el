@@ -7,7 +7,7 @@ ELPA    := .elpa
 #   make test-tty NERD_ICONS=~/.emacs.d/elpa/nerd-icons
 LOAD := -L . -L test $(if $(NERD_ICONS),-L $(NERD_ICONS))
 
-.PHONY: all compile lint test test-tty clean
+.PHONY: all compile deps lint test test-tty clean
 
 all: compile lint test test-tty
 
@@ -20,11 +20,23 @@ compile:
 	  -f batch-byte-compile $(MAIN) $(wildcard test/*.el)
 	@rm -f $(PACKAGE).elc test/*.elc
 
-$(ELPA):
-	$(EMACS) -Q --batch --eval '(progn (setq package-user-dir (expand-file-name "$(ELPA)")) (require (quote package)) (add-to-list (quote package-archives) (cons "melpa" "https://melpa.org/packages/") t) (package-initialize) (package-refresh-contents) (package-install (quote package-lint)))'
+# Packages needed to develop on preview-tab, never to use it.  They live under
+# $(ELPA) so they cannot be confused with the user's own.
+DEPS := package-lint
+
+## Install whatever in DEPS is missing, and nothing else.  Depending on the
+## $(ELPA) directory instead would go by whether it exists, which says nothing
+## about what is in it -- and would touch the network on every clean build.
+deps:
+	@$(EMACS) -Q --batch \
+	  --eval '(setq package-user-dir (expand-file-name "$(ELPA)"))' \
+	  --eval '(require (quote package))' \
+	  --eval '(add-to-list (quote package-archives) (cons "melpa" "https://melpa.org/packages/") t)' \
+	  -f package-initialize \
+	  --eval '(let ((missing (delq nil (mapcar (lambda (p) (unless (package-installed-p p) p)) (quote ($(DEPS))))))) (when missing (package-refresh-contents) (mapc (function package-install) missing)))'
 
 ## MELPA readiness: package metadata and docstring conventions.
-lint: $(ELPA)
+lint: deps
 	$(EMACS) -Q --batch \
 	  --eval '(setq package-user-dir (expand-file-name "$(ELPA)"))' \
 	  -f package-initialize -l package-lint $(LOAD) \
