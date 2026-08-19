@@ -128,6 +128,11 @@ instead, which will:
                         (cons #'my-jump-to-thing preview-tab-commands))
 ```
 
+One limit worth knowing: only files opened while the command itself runs are
+picked up. A command that hands the visit off to a timer, a process filter or
+`post-command-hook` has already returned by the time the file appears, and its
+buffer stays an ordinary one.
+
 ### The mode-line marker
 
 The preview buffer's path is italicised and a small marker is shown. With

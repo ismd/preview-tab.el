@@ -150,6 +150,11 @@ Commands from packages that are not installed are harmless: advice attaches
 to the bare symbol and takes effect if the package is ever loaded.  This is
 why third-party commands can be listed here by default.
 
+Only files opened while the command itself runs are picked up.  A command
+that hands the visit off to a timer, a process filter or `post-command-hook'
+has already returned by the time the file appears, and its buffer stays an
+ordinary one.
+
 Changing this list while the mode is on only takes effect through the
 customize machinery -- `setopt', `customize-set-variable', the Customize
 interface -- because that is what reattaches the advice.  A plain `setq'
