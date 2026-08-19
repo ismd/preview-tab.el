@@ -150,6 +150,11 @@ Commands from packages that are not installed are harmless: advice attaches
 to the bare symbol and takes effect if the package is ever loaded.  This is
 why third-party commands can be listed here by default.
 
+Changing this list while the mode is on only takes effect through the
+customize machinery -- `setopt', `customize-set-variable', the Customize
+interface -- because that is what reattaches the advice.  A plain `setq'
+or `add-to-list' will not.
+
 Note that `find-file' is deliberately absent.  Like VS Code, which does not
 preview from Quick Open either, typing a file name is taken as a deliberate
 act; use `preview-tab-find-file' when you want the other behaviour."

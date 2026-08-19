@@ -106,10 +106,24 @@ There are no dependencies beyond Emacs 27.1.
 
 Listing a command from a package you have not installed is harmless — the
 advice attaches to the bare symbol and only ever fires if that package loads.
-So you can add things freely:
+So you can add things freely — as long as you do it before turning the mode
+on:
 
 ```elisp
 (add-to-list 'preview-tab-commands #'my-jump-to-thing)
+(preview-tab-mode 1)
+```
+
+Afterwards the advice is already attached to whatever the list held at the
+time, and `add-to-list` won't reattach it. Go through the customize machinery
+instead, which will:
+
+```elisp
+(setopt preview-tab-commands (cons #'my-jump-to-thing preview-tab-commands))
+
+;; before Emacs 29:
+(customize-set-variable 'preview-tab-commands
+                        (cons #'my-jump-to-thing preview-tab-commands))
 ```
 
 ### The mode-line marker
