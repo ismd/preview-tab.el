@@ -40,6 +40,13 @@ jobs:
       - name: Dev dependencies
         run: make deps
 
+      # Once is enough: package-lint and checkdoc judge the source, not the
+      # Emacs running them, and a recent package-lint has its own ideas about
+      # which Emacs it wants.
+      - name: Lint
+        if: matrix.emacs_version == '30.1'
+        run: make lint
+
       # Needs a real frame: under --batch, `format-mode-line' returns "" for
       # every input, so these assertions would be vacuous.  `script' from
       # util-linux provides the pty.
