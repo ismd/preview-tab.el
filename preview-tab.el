@@ -261,11 +261,20 @@ BUFFER defaults to the current buffer.  Also used as a buffer-local
     (when preview-tab--previewing
       (setq preview-tab--previewing nil)
       (remove-hook 'first-change-hook #'preview-tab--promote t)
+      (remove-hook 'kill-buffer-hook #'preview-tab--forget t)
       (mapc #'face-remap-remove-relative preview-tab--face-cookies)
       (setq preview-tab--face-cookies nil)
       (force-mode-line-update))
     (when (eq (current-buffer) preview-tab-buffer)
       (setq preview-tab-buffer nil))))
+
+(defun preview-tab--forget ()
+  "Forget the current buffer as it is killed.
+Buffer-local `kill-buffer-hook'.  A preview killed from outside this package
+-- `C-x k', `kill-some-buffers', a mode tidying up after itself -- would
+otherwise leave a dead buffer pinned in `preview-tab-buffer'."
+  (when (eq (current-buffer) preview-tab-buffer)
+    (setq preview-tab-buffer nil)))
 
 (defun preview-tab--disposable-p (buffer)
   "Return non-nil if BUFFER is a preview that may be killed."
@@ -296,6 +305,7 @@ killed and never kept."
       (unless preview-tab--previewing
         (setq preview-tab--previewing t)
         (add-hook 'first-change-hook #'preview-tab--promote nil t)
+        (add-hook 'kill-buffer-hook #'preview-tab--forget nil t)
         (setq preview-tab--face-cookies
               (mapcar (lambda (face) (face-remap-add-relative face 'italic))
                       preview-tab-slant-faces)))

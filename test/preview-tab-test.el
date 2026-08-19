@@ -109,6 +109,14 @@ Restores global state and deletes the scratch files afterwards."
     (preview-tab-test--settle)
     (should (preview-tab-test--live-p "a.txt"))))
 
+(ert-deftest preview-tab-test-killing-the-preview-clears-the-pointer ()
+  "Killing a preview by hand must not leave a dead buffer pinned."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (kill-buffer (get-file-buffer (preview-tab-test--file "a.txt")))
+    (should-not preview-tab-buffer)))
+
 (ert-deftest preview-tab-test-keep-promotes ()
   "`preview-tab-keep' spares the buffer from the next preview."
   (preview-tab-test--with-env
