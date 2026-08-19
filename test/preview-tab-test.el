@@ -400,6 +400,21 @@ ever clean it up."
       (preview-tab-mode -1))
     (should-not (member preview-tab--mode-line-entry mode-line-misc-info))))
 
+(ert-deftest preview-tab-test-enabling-twice-changes-nothing ()
+  "Turning the mode on again must not stack advice or mode-line entries.
+Easy to do by accident -- a second `preview-tab-mode' call in a config, a
+reloaded init file -- and it would show as a doubled marker."
+  (preview-tab-test--with-env
+    (preview-tab-mode 1)
+    (preview-tab-mode 1)
+    (let ((advices 0))
+      (advice-mapc (lambda (&rest _) (setq advices (1+ advices)))
+                   'preview-tab-test-open)
+      (should (= 1 advices)))
+    (should (= 1 (seq-count (lambda (entry)
+                              (equal entry preview-tab--mode-line-entry))
+                            (default-value 'mode-line-misc-info))))))
+
 (ert-deftest preview-tab-test-mode-line-entry-is-global ()
   "The entry lands on the global value, whichever buffer toggles the mode.
 `preview-tab-mode' is global, but `mode-line-misc-info' can be buffer-local,
