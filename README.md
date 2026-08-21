@@ -98,6 +98,26 @@ With [elpaca](https://github.com/progfolio/elpaca):
   :config (preview-tab-mode 1))
 ```
 
+In [Doom Emacs](https://github.com/doomemacs/doomemacs), declare the package in
+`packages.el`:
+
+```elisp
+;; packages.el
+(package! preview-tab :recipe (:host github :repo "ismd/preview-tab.el"))
+```
+
+enable it in `config.el`:
+
+```elisp
+;; config.el
+(use-package! preview-tab
+  :config (preview-tab-mode 1))
+```
+
+and run `doom sync`, then restart Emacs. Doom brings entry points of its own
+that are worth adding to `preview-tab-commands` — see [Doom Emacs](#doom-emacs)
+below.
+
 There are no dependencies beyond Emacs 27.1.
 
 ## Customization
@@ -153,6 +173,10 @@ there is no need to detect which mode line you use. If yours is not covered, add
 its faces to the list.
 
 ## Doom Emacs
+
+Installed as above, the whole configuration — Doom's own jump and search
+commands included, since neither `+lookup/definition` nor `+default/search-project`
+is one of the vanilla commands the default list covers:
 
 ```elisp
 ;; packages.el
