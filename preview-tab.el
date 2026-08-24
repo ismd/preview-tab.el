@@ -130,6 +130,13 @@ variable."
     dired-find-file-other-window
     treemacs-visit-node-no-split
     treemacs-visit-node-in-most-recently-used-window
+    ;; version control
+    magit-diff-visit-file
+    magit-diff-visit-file-other-window
+    magit-diff-visit-file-other-frame
+    magit-diff-visit-worktree-file
+    magit-diff-visit-worktree-file-other-window
+    magit-diff-visit-worktree-file-other-frame
     ;; code navigation
     xref-goto-xref
     xref-find-definitions

@@ -218,6 +218,47 @@ Restores global state and deletes the scratch files afterwards."
             (should-not (preview-tab-test--live-p "a.txt")))
         (when grep (kill-buffer grep))))))
 
+;; Defined by the test below, at run time and only for as long as it runs --
+;; which is the very thing being tested, and which the byte-compiler has no
+;; way of seeing.
+(declare-function preview-tab-test-open-late "preview-tab-test" (name))
+
+(ert-deftest preview-tab-test-command-defined-later-still-previews ()
+  "A command whose package loads after the mode does still previews.
+This is what lets the default list name commands from packages that may not
+be installed -- Treemacs, Magit, consult.  The advice goes on the bare
+symbol, and has to survive the definition arriving afterwards."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(preview-tab-test-open-late)))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (unwind-protect
+          (progn
+            (should-not (fboundp 'preview-tab-test-open-late))
+            (defalias 'preview-tab-test-open-late
+              (lambda (name)
+                (interactive "sFile: ")
+                (preview-tab-test-open name)))
+            (preview-tab-test-open-late "a.txt")
+            (preview-tab-test--settle)
+            (should (preview-tab-test--preview-p "a.txt")))
+        (fmakunbound 'preview-tab-test-open-late)))))
+
+(ert-deftest preview-tab-test-magit-visit-commands-are-entry-points ()
+  "Visiting a file from a Magit diff is a preview out of the box.
+Magit is not a test dependency -- pulling in transient, with-editor, dash and
+the rest to press RET once is not worth it -- so this checks the list the
+advice is built from rather than driving the commands.  What happens once
+the advice is on them is covered by
+`preview-tab-test-command-defined-later-still-previews'."
+  (dolist (cmd '(magit-diff-visit-file
+                 magit-diff-visit-file-other-window
+                 magit-diff-visit-file-other-frame
+                 magit-diff-visit-worktree-file
+                 magit-diff-visit-worktree-file-other-window
+                 magit-diff-visit-worktree-file-other-frame))
+    (should (memq cmd (default-value 'preview-tab-commands)))))
+
 
 ;;;; What must never be touched
 

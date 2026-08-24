@@ -18,8 +18,8 @@ real tab once you edit it. `preview-tab-mode` brings that behaviour to Emacs.
 (preview-tab-mode 1)
 ```
 
-That's it. Now opening a file from Dired, Treemacs, `xref`, grep results or
-`consult` puts it in one temporary buffer, marked in the mode line. Open the
+That's it. Now opening a file from Dired, Treemacs, Magit, `xref`, grep results
+or `consult` puts it in one temporary buffer, marked in the mode line. Open the
 next one and the previous is gone.
 
 ## The rules
@@ -124,11 +124,28 @@ There are no dependencies beyond Emacs 27.1.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `preview-tab-commands` | Dired, Treemacs, xref, compile/grep, flymake, consult | Commands whose file visits are previews. |
+| `preview-tab-commands` | Dired, Treemacs, Magit, xref, compile/grep, flymake, consult | Commands whose file visits are previews. |
 | `preview-tab-slant-faces` | vanilla, doom-modeline, tab-line, centaur-tabs faces | Faces italicised while a buffer is a preview. |
 | `preview-tab-indicator` | `auto` | `auto`, `icon`, `label`, `both`, or nil. |
 | `preview-tab-icon` | `"nf-md-eye_outline"` | [nerd-icons](https://github.com/rainstormstudio/nerd-icons.el) Material Design icon name. |
 | `preview-tab-label` | `"PREVIEW"` | Text marker. |
+
+### Magit
+
+`RET` on a file in a Magit status or diff buffer runs `magit-diff-visit-file`,
+which is a preview source out of the box — as are its worktree, other-window
+and other-frame variants.
+
+One thing is worth knowing, and it is Magit's design rather than this package's:
+`magit-diff-visit-file` does not always visit a *file*. On a staged change it
+visits the blob from the index, and on a committed change the blob from that
+commit. Those buffers visit nothing on disk, so `preview-tab` leaves them
+alone — they are read-only and Magit reaps them itself. Untracked files and
+unstaged changes do open the real worktree file, and `magit-diff-visit-worktree-file`
+(`C-j`, or `C-<return>`) opens it from anywhere. Those become previews.
+
+`magit-find-file` is deliberately absent, for the same reason `find-file` is:
+typing a file name is a deliberate act.
 
 ### Adding your own entry points
 

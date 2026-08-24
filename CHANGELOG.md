@@ -6,6 +6,14 @@ Notable changes to preview-tab. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Magit is a preview source. `RET` on a file in a Magit status or diff buffer —
+  `magit-diff-visit-file`, along with its worktree, other-window and
+  other-frame variants — now opens into the preview buffer. Note that Magit
+  visits the index or a commit's blob rather than the file itself for staged
+  and committed changes; those buffers are not file buffers and are left alone.
+
 ### Fixed
 
 - A preview that could not be killed — visible in another window, or running a
