@@ -55,7 +55,8 @@ Two things deliberately do **not** happen, both matching VS Code:
 and VS Code does not preview from Quick Open either. When you do want to just
 peek at a named file, use `preview-tab-find-file` — though if the file is
 already open it stays as it is, since nothing here demotes a buffer you
-already have.
+already have. If you disagree with the rule itself, you can turn it off; see
+[Previewing `find-file`](#previewing-find-file).
 
 ## Commands
 
@@ -125,6 +126,7 @@ There are no dependencies beyond Emacs 27.1.
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `preview-tab-commands` | Dired, Treemacs, Magit, xref, compile/grep, flymake, consult | Commands whose file visits are previews. |
+| `preview-tab-include-find-file` | nil | Whether `find-file` and `magit-find-file` preview too. |
 | `preview-tab-slant-faces` | vanilla, doom-modeline, tab-line, centaur-tabs faces | Faces italicised while a buffer is a preview. |
 | `preview-tab-indicator` | `auto` | `auto`, `icon`, `label`, `both`, or nil. |
 | `preview-tab-icon` | `"nf-md-eye_outline"` | [nerd-icons](https://github.com/rainstormstudio/nerd-icons.el) Material Design icon name. |
@@ -145,7 +147,42 @@ unstaged changes do open the real worktree file, and `magit-diff-visit-worktree-
 (`C-j`, or `C-<return>`) opens it from anywhere. Those become previews.
 
 `magit-find-file` is deliberately absent, for the same reason `find-file` is:
-typing a file name is a deliberate act.
+typing a file name is a deliberate act. Both can be turned into preview sources
+— see [Previewing `find-file`](#previewing-find-file).
+
+### Previewing `find-file`
+
+`find-file` is not a preview source, and neither is `magit-find-file`: typing a
+file name is taken as a deliberate act. If you would rather they previewed too,
+say so:
+
+```elisp
+(setopt preview-tab-include-find-file t)
+```
+
+That takes in both, each along with the variant that opens in another window and
+the one that opens in another frame.
+
+Two things are worth knowing before switching it on.
+
+**It reaches further than the name suggests.** A great deal of Emacs opens files
+by calling `find-file` itself, so `project-find-file`, `recentf-open-files` and
+jumping to a file register start previewing as well. That is the same instinct
+one step out rather than a surprise in kind — but it is more than the option's
+name promises. Anything going through `find-file-noselect` instead is untouched;
+jumping to a bookmark, for one.
+
+**`magit-find-file` previews only the worktree version of a file.** Asked for a
+revision it builds a read-only blob buffer, which visits nothing on disk and is
+left alone, exactly as in a Magit diff. If you want `find-file` without it, leave
+the option off and list `find-file` where everything else goes:
+
+```elisp
+(setopt preview-tab-commands (cons #'find-file preview-tab-commands))
+```
+
+With this on, `preview-tab-find-file` has nothing left to add — `find-file`
+already does what it did. It keeps working either way.
 
 ### Adding your own entry points
 

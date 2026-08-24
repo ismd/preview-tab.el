@@ -8,6 +8,11 @@ Notable changes to preview-tab. The format follows
 
 ### Added
 
+- `preview-tab-include-find-file`, off by default, makes `find-file` and
+  `magit-find-file` preview too — each along with the variant that opens in
+  another window and the one that opens in another frame. Note that much of
+  Emacs opens files by calling `find-file` itself, so `project-find-file` and
+  `recentf-open-files` start previewing along with it.
 - Magit is a preview source. `RET` on a file in a Magit status or diff buffer —
   `magit-diff-visit-file`, along with its worktree, other-window and
   other-frame variants — now opens into the preview buffer. Note that Magit

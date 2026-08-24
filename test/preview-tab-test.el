@@ -433,6 +433,53 @@ ever clean it up."
     (should (preview-tab-test--preview-p "a.txt"))))
 
 
+;;;; Including find-file
+
+(ert-deftest preview-tab-test-include-find-file-previews-it ()
+  "With `preview-tab-include-find-file' on, `find-file' previews."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands nil)
+          (preview-tab-include-find-file t))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (find-file (preview-tab-test--file "a.txt"))
+      (preview-tab-test--settle)
+      (should (preview-tab-test--preview-p "a.txt")))))
+
+(ert-deftest preview-tab-test-include-find-file-covers-the-whole-family ()
+  "The option takes in `magit-find-file' and the window and frame variants.
+Checked through the advice rather than the constant, so that it is the
+commands actually taken over that are pinned down.  Magit need not be
+installed for this: the advice goes on the bare symbol either way."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands nil)
+          (preview-tab-include-find-file t))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (dolist (cmd '(find-file
+                     find-file-other-window
+                     find-file-other-frame
+                     magit-find-file
+                     magit-find-file-other-window
+                     magit-find-file-other-frame))
+        (should (advice-member-p #'preview-tab--advice cmd)))
+      (preview-tab-mode -1))))
+
+(ert-deftest preview-tab-test-find-file-can-be-listed-on-its-own ()
+  "`find-file' can still go in `preview-tab-commands' by hand.
+That is the documented way to have it without `magit-find-file', which the
+option takes along."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(find-file))
+          (preview-tab-include-find-file nil))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (should-not (advice-member-p #'preview-tab--advice 'magit-find-file))
+      (find-file (preview-tab-test--file "a.txt"))
+      (preview-tab-test--settle)
+      (should (preview-tab-test--preview-p "a.txt")))))
+
+
 ;;;; Mode line
 
 (ert-deftest preview-tab-test-slants-every-configured-face ()
@@ -554,6 +601,18 @@ advice."
     (setq preview-tab-commands nil)
     (preview-tab-mode -1)
     (should-not (advice-member-p #'preview-tab--advice 'preview-tab-test-open))))
+
+(ert-deftest preview-tab-test-mode-off-unadvises-find-file ()
+  "Turning the mode off has to let go of `find-file' as well.
+It is a command the whole of Emacs calls, and advice left behind on it
+would go on marking and killing buffers for the rest of the session."
+  (preview-tab-test--with-env
+    (let ((preview-tab-include-find-file t))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (should (advice-member-p #'preview-tab--advice 'find-file))
+      (preview-tab-mode -1)
+      (should-not (advice-member-p #'preview-tab--advice 'find-file)))))
 
 (ert-deftest preview-tab-test-advice-is-inert-while-the-mode-is-off ()
   "Advice that outlives the mode must neither preview nor kill.

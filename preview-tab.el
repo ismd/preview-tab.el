@@ -50,6 +50,10 @@
 ;;                            counterpart to `find-file'
 ;;   `preview-tab-keep'       keep the current preview buffer for good
 ;;
+;; Typing a file name is taken as a deliberate act and opens the file for good,
+;; as in VS Code.  Set `preview-tab-include-find-file' if you would rather
+;; `find-file' previewed too.
+;;
 ;; The current preview is marked in the mode line: the buffer path is italicised
 ;; and a small indicator is shown.  Both are configurable; see
 ;; `preview-tab-slant-faces' and `preview-tab-indicator'.
@@ -169,8 +173,45 @@ or `add-to-list' will not.
 
 Note that `find-file' is deliberately absent.  Like VS Code, which does not
 preview from Quick Open either, typing a file name is taken as a deliberate
-act; use `preview-tab-find-file' when you want the other behaviour."
+act; use `preview-tab-find-file' when you want the other behaviour once, or
+`preview-tab-include-find-file' when you want it always."
   :type '(repeat function)
+  :set #'preview-tab--set-and-refresh
+  :group 'preview-tab)
+
+(defconst preview-tab--find-file-commands
+  '(find-file
+    find-file-other-window
+    find-file-other-frame
+    magit-find-file
+    magit-find-file-other-window
+    magit-find-file-other-frame)
+  "Commands `preview-tab-include-find-file' takes in when it is on.")
+
+(defcustom preview-tab-include-find-file nil
+  "Whether `find-file' opens a preview too.
+
+Off by default, because naming a file is a deliberate act -- see
+`preview-tab-commands'.  Turn it on and `find-file' and `magit-find-file'
+preview, each along with the variant that opens in another window and the
+one that opens in another frame.
+
+These are advised alongside `preview-tab-commands', so everything said
+there applies here too -- including that changing this while the mode is
+on only takes effect through the customize machinery.
+
+Turning this on reaches further than the name suggests.  Much of Emacs
+opens files by calling `find-file' itself, so `project-find-file',
+`recentf-open-files' and jumping to a file register start previewing as
+well.  That is the same instinct one step out, but it is worth knowing
+before you switch it on.
+
+`magit-find-file' previews only the worktree version of a file.  Asked
+for a revision it builds a read-only blob buffer, which visits no file on
+disk and is left alone, exactly as in a Magit diff.  If you want
+`find-file' without it, leave this off and put `find-file' in
+`preview-tab-commands' instead."
+  :type 'boolean
   :set #'preview-tab--set-and-refresh
   :group 'preview-tab)
 
@@ -234,6 +275,18 @@ Used when `preview-tab-indicator' asks for a label."
   '((t (:inherit (mode-line-buffer-id italic) :weight normal)))
   "Face for the preview marker's text label in the mode line."
   :group 'preview-tab)
+
+(defun preview-tab--commands-to-advise ()
+  "Return every command the mode should take over.
+`preview-tab-commands', and the `find-file' family as well when
+`preview-tab-include-find-file' is on.  `seq-uniq' rather than
+`delete-dups': a command named in both must be advised once, and the
+result has to be a fresh list -- the destructive one would splice a cons
+out of the caller's own list, or out of the constant behind the option."
+  (seq-uniq (append preview-tab-commands
+                    (and preview-tab-include-find-file
+                         preview-tab--find-file-commands))))
+
 
 ;;;; The mode-line marker
 
@@ -446,7 +499,7 @@ permanent."
   (setq preview-tab--indicator-cache nil)
   (if preview-tab-mode
       (progn
-        (setq preview-tab--advised (copy-sequence preview-tab-commands))
+        (setq preview-tab--advised (preview-tab--commands-to-advise))
         (dolist (cmd preview-tab--advised)
           (advice-add cmd :around #'preview-tab--advice))
         ;; Not `add-to-list' and `setq': `mode-line-misc-info' can be
