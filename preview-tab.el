@@ -3,6 +3,7 @@
 ;; Copyright (C) 2026 Vladimir Kosteley
 
 ;; Author: Vladimir Kosteley <github@ismd.dev>
+;; Assisted-by: Claude:claude-opus-5
 ;; Version: 0.1.0
 ;; URL: https://github.com/ismd/preview-tab.el
 ;; Keywords: convenience, files
