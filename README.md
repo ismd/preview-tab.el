@@ -14,6 +14,8 @@ VS Code solves this with the *preview tab*: a file opened by browsing goes into
 a single italicised tab, the next such file replaces it, and it only becomes a
 real tab once you edit it. `preview-tab-mode` brings that behaviour to Emacs.
 
+![preview-tab replacing browsed files and keeping an edited file](preview-tab.gif)
+
 ```elisp
 (preview-tab-mode 1)
 ```
