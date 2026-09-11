@@ -67,7 +67,7 @@
 (require 'seq)
 
 (declare-function nerd-icons-mdicon "nerd-icons" (icon-name &rest args))
-(declare-function tab-line-force-update "tab-line" (all))
+(declare-function tab-line-force-update "tab-line")
 
 
 ;;;; State
@@ -374,8 +374,17 @@ tab-line keeps each window's rendered tabs in a window parameter, and the
 cache key it builds knows nothing about previews, so a tab whose standing
 has just changed would go on being drawn the way it already was."
   (if (fboundp 'tab-line-force-update)
-      ;; It forces the mode-line update itself.
+      ;; It clears every window's cache and forces the update itself.
       (tab-line-force-update t)
+    ;; `tab-line-force-update' only arrived in Emacs 30.1, while the cache it
+    ;; clears has been there since 28.1 -- so on 28 and 29 the tabs need
+    ;; clearing by hand, or a preview that has just changed standing keeps the
+    ;; face it was drawn with.  This is precisely what that function does.  On a
+    ;; version with no cache to speak of it leaves an unread window parameter
+    ;; behind and nothing else.
+    (walk-windows (lambda (window)
+                    (set-window-parameter window 'tab-line-cache nil))
+                  'no-mini t)
     (force-mode-line-update t)))
 
 
@@ -590,8 +599,14 @@ permanent."
     (dolist (cmd preview-tab--advised)
       (advice-remove cmd #'preview-tab--advice))
     (setq preview-tab--advised nil)
-    ;; Quiet when tab-line was never loaded: `remove-hook' checks for that.
-    (remove-hook 'tab-line-tab-face-functions #'preview-tab-tab-line-face)
+    ;; Guarded for the same reason the `add-hook' above is, and it is
+    ;; `remove-hook' that makes the guard necessary: its first act on an
+    ;; unbound hook is to define it as nil.  On Emacs 27, where tab-line has
+    ;; no such variable, turning the mode off would otherwise create one --
+    ;; and a later Emacs reading that saved value would find tab-line's own
+    ;; defaults gone.
+    (when (boundp 'tab-line-tab-face-functions)
+      (remove-hook 'tab-line-tab-face-functions #'preview-tab-tab-line-face))
     (setq-default mode-line-misc-info
                   (remove preview-tab--mode-line-entry
                           (default-value 'mode-line-misc-info)))

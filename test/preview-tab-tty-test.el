@@ -155,6 +155,8 @@ for the face it inherits from."
 The buffer-local remapping cannot do this on its own: the tab line being
 drawn belongs to the other buffer's window, which never sees the preview's
 `face-remapping-alist'."
+  ;; The hook this rides on arrived in Emacs 28.1.
+  (skip-unless (boundp 'tab-line-tab-face-functions))
   (preview-tab-tty-test--with-env
     (preview-tab-tty-test-open "a.txt")
     (preview-tab-tty-test--settle)
@@ -171,6 +173,8 @@ drawn belongs to the other buffer's window, which never sees the preview's
   "Keeping the preview straightens its tab in another buffer's window too.
 Without the cache being cleared the tab would go on being drawn slanted:
 tab-line's cache key has no idea what a preview is."
+  ;; The hook this rides on arrived in Emacs 28.1.
+  (skip-unless (boundp 'tab-line-tab-face-functions))
   (preview-tab-tty-test--with-env
     (preview-tab-tty-test-open "a.txt")
     (preview-tab-tty-test--settle)

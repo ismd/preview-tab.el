@@ -17,6 +17,10 @@
 (require 'dired)
 (require 'grep)
 (require 'tab-line)
+
+;; Not bound before Emacs 28.1, and the byte-compiler has to be told so or it
+;; reads the test below as touching a free variable.
+(defvar tab-line-tab-face-functions)
 (require 'preview-tab)
 
 (defvar preview-tab-test--dir nil
@@ -636,6 +640,7 @@ This runs inside redisplay, where signalling is not an option."
   "The mode adds its face function to the hook and takes it back.
 tab-line's own entries have to survive both, or the tabs would lose the
 modified and special markers for as long as the mode is on."
+  (skip-unless (boundp 'tab-line-tab-face-functions))
   (let ((preview-tab-commands nil)
         (defaults (copy-sequence tab-line-tab-face-functions)))
     (preview-tab-mode 1)
