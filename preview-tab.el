@@ -4,7 +4,7 @@
 
 ;; Author: Vladimir Kosteley <github@ismd.dev>
 ;; Assisted-by: Claude:claude-opus-5
-;; Version: 0.2.0
+;; Version: 0.3.0
 ;; URL: https://github.com/ismd/preview-tab.el
 ;; Keywords: convenience, files
 ;; Package-Requires: ((emacs "27.1"))
