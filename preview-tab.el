@@ -57,7 +57,9 @@
 ;;
 ;; The current preview is marked in the mode line: the buffer path is italicised
 ;; and a small indicator is shown.  Both are configurable; see
-;; `preview-tab-slant-faces' and `preview-tab-indicator'.
+;; `preview-tab-slant-faces' and `preview-tab-indicator'.  Under
+;; `tab-line-mode' the preview's tab is italicised too, whether or not it is
+;; the selected one.
 
 ;;; Code:
 
@@ -65,6 +67,7 @@
 (require 'seq)
 
 (declare-function nerd-icons-mdicon "nerd-icons" (icon-name &rest args))
+(declare-function tab-line-force-update "tab-line" (all))
 
 
 ;;;; State
@@ -226,8 +229,6 @@ disk and is left alone, exactly as in a Magit diff.  If you want
     doom-modeline-project-root-dir
     doom-modeline-buffer-path
     doom-modeline-buffer-file
-    ;; tab-line-mode
-    tab-line-tab-current
     ;; centaur-tabs
     centaur-tabs-selected
     centaur-tabs-selected-modified)
@@ -236,7 +237,20 @@ disk and is left alone, exactly as in a Magit diff.  If you want
 The list covers several mode lines at once on purpose.  Remapping a face
 that the current mode line never draws, or that is not even defined, costs
 nothing and fails silently, so there is no need to detect which mode line
-is in use."
+is in use.
+
+The remapping is buffer-local, though, so it only reaches what is drawn
+for the preview buffer itself.  That is all a mode line ever is, but not
+all a tab line is: a tab line draws other buffers' tabs too, and the
+window drawing them never sees the preview's remapping.  No tab-line face
+is listed here for that reason -- `tab-line-mode' is handled by
+`preview-tab-tab-line-face' instead, which slants the preview's tab in
+every window, selected or not.  It needs Emacs 28.1, where
+`tab-line-tab-face-functions' arrived; on Emacs 27 the tabs simply are
+not slanted.
+
+Centaur-tabs is listed, but it has the same limitation for the same
+reason: only the tab of the window showing the preview is slanted."
   :type '(repeat face)
   :set #'preview-tab--set-and-refresh
   :group 'preview-tab)
@@ -316,6 +330,55 @@ out of the caller's own list, or out of the constant behind the option."
         marker)))
 
 
+;;;; The tab-line marker
+
+;; Public, and autoloaded, for one reason: `tab-line-tab-face-functions' is a
+;; `defcustom'.  A user who opens it in Customize while the mode is on is shown
+;; this function as part of the value, and saving it writes the symbol to their
+;; custom file -- from where redisplay will call it at the next startup, before
+;; anything has pulled this package in.  A name a user can be handed like that
+;; is part of the interface whatever we would rather call it.
+;;;###autoload
+(defun preview-tab-tab-line-face (tab _tabs face buffer-p _selected-p)
+  "Return FACE italicised when TAB stands for the preview buffer.
+TAB is a buffer when BUFFER-P is non-nil, and otherwise an alist holding
+one under the key `buffer' -- `tab-line-tabs-function' is free to hand
+out either shape, and a group tab holds no buffer at all.
+
+A member of `tab-line-tab-face-functions', which is the only thing that
+reaches a tab as some *other* window draws it.  The face remapping behind
+`preview-tab-slant-faces' cannot: it is buffer-local, so it applies just
+where the preview buffer is the one on display.  That slants the tab
+while it is selected and drops the slant the moment you switch away,
+which is the whole reason this exists."
+  (let ((buffer (if buffer-p tab (cdr (assq 'buffer tab)))))
+    ;; `buffer-live-p' first: this runs inside redisplay, where a signal is
+    ;; very unwelcome, and a tab may well name a buffer that has since been
+    ;; killed -- which is exactly what `buffer-local-value' objects to.
+    (if (and (buffer-live-p buffer) (preview-tab-buffer-p buffer))
+        `(:inherit (italic ,face))
+      face)))
+
+;; The other way round would be `tab-line-cache-key-function': add preview
+;; standing to the key, via `add-function', and each window's cache would
+;; invalidate itself exactly when it had to.  A correct key has to cover every
+;; tab, though -- any of them may be the preview, not just the window's own
+;; buffer -- so it would mean a `mapcar' over the tabs on every redisplay of
+;; every tab line, against one sweep per change here.  Previews change rarely
+;; and redisplay runs constantly, so this way round is the cheaper one, at the
+;; price of clearing more caches than strictly had to go.
+(defun preview-tab--refresh ()
+  "Redraw everything that shows whether a buffer is a preview.
+`force-mode-line-update' alone is not enough once tab lines are in play:
+tab-line keeps each window's rendered tabs in a window parameter, and the
+cache key it builds knows nothing about previews, so a tab whose standing
+has just changed would go on being drawn the way it already was."
+  (if (fboundp 'tab-line-force-update)
+      ;; It forces the mode-line update itself.
+      (tab-line-force-update t)
+    (force-mode-line-update t)))
+
+
 ;;;; Preview bookkeeping
 
 (defun preview-tab-buffer-p (&optional buffer)
@@ -334,7 +397,7 @@ BUFFER defaults to the current buffer.  Also used as a buffer-local
       (remove-hook 'kill-buffer-hook #'preview-tab--forget t)
       (mapc #'face-remap-remove-relative preview-tab--face-cookies)
       (setq preview-tab--face-cookies nil)
-      (force-mode-line-update))
+      (preview-tab--refresh))
     (when (eq (current-buffer) preview-tab-buffer)
       (setq preview-tab-buffer nil))))
 
@@ -379,14 +442,18 @@ killed and never kept."
   (let ((old preview-tab-buffer))
     (setq preview-tab-buffer buffer)
     (with-current-buffer buffer
+      ;; Inside the `unless', not after it: re-marking the buffer that is
+      ;; already the preview changes nothing to draw, and browsing commands do
+      ;; that constantly -- `next-error' down a list of hits in one file is
+      ;; nothing but re-marks.  `preview-tab--refresh' is not free.
       (unless preview-tab--previewing
         (setq preview-tab--previewing t)
         (add-hook 'first-change-hook #'preview-tab--promote nil t)
         (add-hook 'kill-buffer-hook #'preview-tab--forget nil t)
         (setq preview-tab--face-cookies
               (mapcar (lambda (face) (face-remap-add-relative face 'italic))
-                      preview-tab-slant-faces)))
-      (force-mode-line-update))
+                      preview-tab-slant-faces))
+        (preview-tab--refresh)))
     (when (and old (not (eq old buffer)))
       ;; The old preview is still on screen right now; let redisplay swap it out
       ;; before deciding what to do with it.
@@ -510,10 +577,21 @@ permanent."
                         (default-value 'mode-line-misc-info))
           (setq-default mode-line-misc-info
                         (append (default-value 'mode-line-misc-info)
-                                (list preview-tab--mode-line-entry)))))
+                                (list preview-tab--mode-line-entry))))
+        ;; Load tab-line rather than reaching for the variable blind: `add-hook'
+        ;; on an unbound symbol would define it as nil, and the `defvar' in
+        ;; tab-line.el would then decline to install its own default -- costing
+        ;; the user the modified and special tab markers.  It has been built in
+        ;; since Emacs 27.1; the hook itself only arrived in 28.1, and where
+        ;; it is missing the tabs are simply left unslanted.
+        (when (and (require 'tab-line nil t)
+                   (boundp 'tab-line-tab-face-functions))
+          (add-hook 'tab-line-tab-face-functions #'preview-tab-tab-line-face)))
     (dolist (cmd preview-tab--advised)
       (advice-remove cmd #'preview-tab--advice))
     (setq preview-tab--advised nil)
+    ;; Quiet when tab-line was never loaded: `remove-hook' checks for that.
+    (remove-hook 'tab-line-tab-face-functions #'preview-tab-tab-line-face)
     (setq-default mode-line-misc-info
                   (remove preview-tab--mode-line-entry
                           (default-value 'mode-line-misc-info)))

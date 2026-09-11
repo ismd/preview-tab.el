@@ -129,7 +129,7 @@ a preview if the command that opened it is in `preview-tab-commands`.
 | --- | --- | --- |
 | `preview-tab-commands` | Dired, Treemacs, Magit, xref, compile/grep, flymake, consult | Commands whose file visits are previews. |
 | `preview-tab-include-find-file` | nil | Whether `find-file` and `magit-find-file` preview too. |
-| `preview-tab-slant-faces` | vanilla, doom-modeline, tab-line, centaur-tabs faces | Faces italicised while a buffer is a preview. |
+| `preview-tab-slant-faces` | vanilla, doom-modeline, centaur-tabs faces | Faces italicised while a buffer is a preview. `tab-line-mode` is handled separately, by `preview-tab-tab-line-face`. |
 | `preview-tab-indicator` | `auto` | `auto`, `icon`, `label`, `both`, or nil. |
 | `preview-tab-icon` | `"nf-md-eye_outline"` | [nerd-icons](https://github.com/rainstormstudio/nerd-icons.el) Material Design icon name. |
 | `preview-tab-label` | `"PREVIEW"` | Text marker. |
@@ -213,6 +213,13 @@ with `nerd-icons` installed, otherwise the text `PREVIEW`. Set
 `preview-tab-indicator` to `both` for icon *and* label, or to nil for italics
 only — closest to what VS Code actually does. If your mode line isn't italicised,
 add its faces to `preview-tab-slant-faces`.
+
+Under `tab-line-mode` the preview's tab is italicised as well, and stays that
+way when you select another tab — the VS Code look. This is done by
+`preview-tab-tab-line-face`, which the mode adds to
+`tab-line-tab-face-functions`, and it needs Emacs 28.1, where that hook
+arrived. On Emacs 27 the tabs are not slanted; the mode-line marker is
+unaffected.
 
 ## Relationship to consult
 

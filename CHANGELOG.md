@@ -4,6 +4,32 @@ Notable changes to preview-tab. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0]
+
+### Added
+
+- `preview-tab-tab-line-face`, added to `tab-line-tab-face-functions` while the
+  mode is on. It is public because Customize will offer it to anyone who edits
+  that option, and saving from there writes the name to their custom file.
+
+### Fixed
+
+- Under `tab-line-mode`, the preview's tab lost its italics as soon as another
+  tab was selected. The slant came from a buffer-local face remapping, which
+  only reaches a tab line drawn for the preview buffer itself — never one drawn
+  by the window showing whatever you switched to. The tab is now slanted through
+  `tab-line-tab-face-functions`, so it stays italic in every window, and
+  tab-line's render cache is cleared whenever a buffer takes on or gives up
+  preview status. Needs Emacs 28.1, where that hook arrived; on Emacs 27 tabs
+  are not slanted at all, and the mode-line marker is unaffected.
+
+### Changed
+
+- `tab-line-tab-current` is no longer in the default `preview-tab-slant-faces`.
+  Remapping it only ever slanted the tab while the preview was the selected
+  buffer, which is the bug above; `preview-tab-tab-line-face` covers the tab
+  line properly now. Nothing else in the list changed.
+
 ## [0.2.0]
 
 ### Added

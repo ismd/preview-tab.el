@@ -16,6 +16,7 @@
 (require 'ert)
 (require 'dired)
 (require 'grep)
+(require 'tab-line)
 (require 'preview-tab)
 
 (defvar preview-tab-test--dir nil
@@ -571,6 +572,116 @@ marker would then show in one buffer and nowhere else."
         (preview-tab-label "PREVIEW")
         (preview-tab--indicator-cache nil))
     (should (string-match-p "PREVIEW" (preview-tab--indicator)))))
+
+
+;;;; Tab line
+
+(defun preview-tab-test--inherits-italic-p (face)
+  "Return non-nil if FACE, an anonymous face spec, pulls in `italic'."
+  (and (memq 'italic (flatten-tree face)) t))
+
+(ert-deftest preview-tab-test-tab-line-slants-a-preview-tab ()
+  "The tab-line face function italicises a tab showing the preview buffer.
+The face asked about is the inactive one on purpose: this is the tab as
+some other window draws it, which is exactly what the buffer-local face
+remapping cannot reach."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (let ((buf (get-file-buffer (preview-tab-test--file "a.txt"))))
+      (should (preview-tab-test--inherits-italic-p
+               (preview-tab-tab-line-face buf (list buf)
+                                           'tab-line-tab-inactive t nil))))))
+
+(ert-deftest preview-tab-test-tab-line-leaves-ordinary-tabs-alone ()
+  "A tab whose buffer is not the preview gets its face back untouched."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (let ((buf (find-file-noselect (preview-tab-test--file "b.txt"))))
+      (should (eq 'tab-line-tab-inactive
+                  (preview-tab-tab-line-face buf (list buf)
+                                              'tab-line-tab-inactive t nil))))))
+
+(ert-deftest preview-tab-test-tab-line-reads-an-alist-tab ()
+  "A tab given as an alist has its buffer looked up under the `buffer' key.
+`tab-line-tabs-function' is free to hand out either shape, and the group
+views that ship with tab-line hand out alists."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (let* ((buf (get-file-buffer (preview-tab-test--file "a.txt")))
+           (tab `((name . "a.txt") (buffer . ,buf))))
+      (should (preview-tab-test--inherits-italic-p
+               (preview-tab-tab-line-face tab (list tab)
+                                           'tab-line-tab-inactive nil nil))))))
+
+(ert-deftest preview-tab-test-tab-line-tolerates-a-tab-without-a-buffer ()
+  "A group tab carries no buffer at all; the face must come back unchanged.
+This runs inside redisplay, where signalling is not an option."
+  (let ((tab '((name . "group") (group-tab . t))))
+    (should (eq 'tab-line-tab-inactive
+                (preview-tab-tab-line-face tab (list tab)
+                                            'tab-line-tab-inactive nil nil)))))
+
+(ert-deftest preview-tab-test-tab-line-tolerates-a-dead-buffer ()
+  "A tab naming a killed buffer must not signal either."
+  (let ((buf (generate-new-buffer " *preview-tab-test-dead*")))
+    (kill-buffer buf)
+    (should (eq 'tab-line-tab-inactive
+                (preview-tab-tab-line-face buf (list buf)
+                                            'tab-line-tab-inactive t nil)))))
+
+(ert-deftest preview-tab-test-tab-line-face-function-is-installed-and-removed ()
+  "The mode adds its face function to the hook and takes it back.
+tab-line's own entries have to survive both, or the tabs would lose the
+modified and special markers for as long as the mode is on."
+  (let ((preview-tab-commands nil)
+        (defaults (copy-sequence tab-line-tab-face-functions)))
+    (preview-tab-mode 1)
+    (unwind-protect
+        (progn
+          (should (memq #'preview-tab-tab-line-face
+                        tab-line-tab-face-functions))
+          (dolist (fn defaults)
+            (should (memq fn tab-line-tab-face-functions))))
+      (preview-tab-mode -1))
+    (should-not (memq #'preview-tab-tab-line-face tab-line-tab-face-functions))
+    (should (equal defaults tab-line-tab-face-functions))))
+
+(ert-deftest preview-tab-test-marking-clears-the-tab-line-cache ()
+  "Taking a buffer on as the preview invalidates the rendered tab line.
+tab-line caches each window's tabs, and its cache key knows nothing about
+previews: without this the tab keeps the face it was last drawn with."
+  (preview-tab-test--with-env
+    (set-window-parameter nil 'tab-line-cache 'stale)
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (should-not (window-parameter nil 'tab-line-cache))))
+
+(ert-deftest preview-tab-test-revisiting-the-preview-leaves-the-cache-alone ()
+  "Re-marking the buffer that is already the preview must not touch the cache.
+Clearing it costs every window a full re-render of its tabs, and browsing
+commands re-mark the standing preview constantly -- `next-error' walking a
+list of hits in one file most of all.  Nothing about the buffer changed, so
+nothing should be redrawn."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (set-window-parameter nil 'tab-line-cache 'fresh)
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (should (eq 'fresh (window-parameter nil 'tab-line-cache)))))
+
+(ert-deftest preview-tab-test-promotion-clears-the-tab-line-cache ()
+  "Promoting a preview invalidates the rendered tab line as well."
+  (preview-tab-test--with-env
+    (preview-tab-test-open "a.txt")
+    (preview-tab-test--settle)
+    (with-current-buffer (get-file-buffer (preview-tab-test--file "a.txt"))
+      (set-window-parameter nil 'tab-line-cache 'stale)
+      (preview-tab-keep)
+      (should-not (window-parameter nil 'tab-line-cache)))))
 
 
 ;;;; Teardown

@@ -17,6 +17,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'tab-line)
 (require 'preview-tab)
 
 (defvar preview-tab-tty-test--dir nil
@@ -131,6 +132,58 @@
       (preview-tab-tty-test-open "a.txt")
       (preview-tab-tty-test--settle)
       (should (equal "" (preview-tab-tty-test--misc-info))))))
+
+(defun preview-tab-tty-test--tab-face (name)
+  "Return the face the selected window's tab line draws the tab NAME with.
+Goes through `tab-line-format', so this is the face redisplay itself would
+use, cache and all."
+  (seq-some (lambda (string)
+              (and (stringp string)
+                   (let ((pos (string-match (regexp-quote name) string)))
+                     (and pos (get-text-property pos 'face string)))))
+            (tab-line-format)))
+
+(defun preview-tab-tty-test--italic-p (face)
+  "Return non-nil if FACE, an anonymous face spec, pulls in `italic'.
+`face-attribute' will not resolve a spec like this one -- it takes a face,
+not a plist -- so the spec is read the way redisplay reads it, by looking
+for the face it inherits from."
+  (and (memq 'italic (flatten-tree face)) t))
+
+(ert-deftest preview-tab-tty-test-an-unselected-preview-tab-is-still-italic ()
+  "The preview keeps its slanted tab in a window showing another buffer.
+The buffer-local remapping cannot do this on its own: the tab line being
+drawn belongs to the other buffer's window, which never sees the preview's
+`face-remapping-alist'."
+  (preview-tab-tty-test--with-env
+    (preview-tab-tty-test-open "a.txt")
+    (preview-tab-tty-test--settle)
+    (let* ((preview (get-file-buffer (preview-tab-tty-test--file "a.txt")))
+           (other (find-file-noselect (preview-tab-tty-test--file "b.txt")))
+           (tab-line-tabs-function (lambda () (list preview other))))
+      (switch-to-buffer other)
+      (should (preview-tab-tty-test--italic-p
+               (preview-tab-tty-test--tab-face "a.txt")))
+      (should-not (preview-tab-tty-test--italic-p
+                   (preview-tab-tty-test--tab-face "b.txt"))))))
+
+(ert-deftest preview-tab-tty-test-promotion-unslants-an-unselected-tab ()
+  "Keeping the preview straightens its tab in another buffer's window too.
+Without the cache being cleared the tab would go on being drawn slanted:
+tab-line's cache key has no idea what a preview is."
+  (preview-tab-tty-test--with-env
+    (preview-tab-tty-test-open "a.txt")
+    (preview-tab-tty-test--settle)
+    (let* ((preview (get-file-buffer (preview-tab-tty-test--file "a.txt")))
+           (other (find-file-noselect (preview-tab-tty-test--file "b.txt")))
+           (tab-line-tabs-function (lambda () (list preview other))))
+      (switch-to-buffer other)
+      ;; Render once, so there is a cache to go stale.
+      (should (preview-tab-tty-test--italic-p
+               (preview-tab-tty-test--tab-face "a.txt")))
+      (with-current-buffer preview (preview-tab-keep))
+      (should-not (preview-tab-tty-test--italic-p
+                   (preview-tab-tty-test--tab-face "a.txt"))))))
 
 (ert-deftest preview-tab-tty-test-advice-keeps-called-interactively-p ()
   "An advised command still sees itself as called interactively.
