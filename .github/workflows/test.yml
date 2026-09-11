@@ -43,9 +43,10 @@ jobs:
       - name: Dev dependencies
         run: make deps
 
-      # Once is enough: package-lint and checkdoc judge the source, not the
-      # Emacs running them, and a recent package-lint has its own ideas about
-      # which Emacs it wants.
+      # Once is enough, and a recent package-lint has its own ideas about which
+      # Emacs it wants.  Note that checkdoc does not judge the source alone --
+      # its defaults have changed between releases -- so the Makefile pins what
+      # differs rather than trusting whichever Emacs lands here.
       - name: Lint
         if: matrix.emacs_version == '30.1'
         run: make lint

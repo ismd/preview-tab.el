@@ -368,7 +368,7 @@ which is the whole reason this exists."
 ;; and redisplay runs constantly, so this way round is the cheaper one, at the
 ;; price of clearing more caches than strictly had to go.
 (defun preview-tab--refresh ()
-  "Redraw everything that shows whether a buffer is a preview.
+  "Redraw the mode lines and tab lines that mark a preview buffer.
 `force-mode-line-update' alone is not enough once tab lines are in play:
 tab-line keeps each window's rendered tabs in a window parameter, and the
 cache key it builds knows nothing about previews, so a tab whose standing

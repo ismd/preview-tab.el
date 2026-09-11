@@ -41,13 +41,20 @@ deps:
 	  --eval '(let ((missing (delq nil (mapcar (lambda (p) (unless (package-installed-p p) p)) (quote ($(DEPS))))))) (when missing (package-refresh-contents) (mapc (function package-install) missing)))'
 
 ## MELPA readiness: package metadata and docstring conventions.
+##
+## `checkdoc-verb-check-experimental-flag' is pinned rather than left at its
+## default, because that default is not stable: t up to Emacs 30, nil from
+## 31.1.  Left alone, checkdoc would be stricter under the Emacs that lints on
+## CI than under a newer one run here, and it fails silently that way round --
+## a docstring that breaks the build reads as clean locally.  Pinned on, every
+## Emacs applies the same check.
 lint: deps
 	$(EMACS) -Q --batch \
 	  --eval '(setq package-user-dir (expand-file-name "$(ELPA)"))' \
 	  -f package-initialize -l package-lint $(LOAD) \
 	  -f package-lint-batch-and-exit $(MAIN)
 	@$(EMACS) -Q --batch \
-	  --eval '(progn (require (quote checkdoc)) (checkdoc-file "$(MAIN)"))' \
+	  --eval '(progn (require (quote checkdoc)) (setq checkdoc-verb-check-experimental-flag t) (checkdoc-file "$(MAIN)"))' \
 	  2> checkdoc.log; \
 	  if [ -s checkdoc.log ]; then cat checkdoc.log; rm -f checkdoc.log; exit 1; fi; \
 	  rm -f checkdoc.log
