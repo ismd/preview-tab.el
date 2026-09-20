@@ -85,7 +85,8 @@ Not on MELPA yet. No dependencies beyond Emacs 27.1.
 
 ### Doom Emacs
 
-Doom's own jump and search commands are not in the default list, so add them:
+Doom's own jump and search commands are in the default list, so nothing beyond
+the usual two blocks is needed:
 
 ```elisp
 ;; packages.el
@@ -93,18 +94,17 @@ Doom's own jump and search commands are not in the default list, so add them:
 
 ;; config.el
 (use-package! preview-tab
-  :config
-  (dolist (cmd '(+default/search-cwd
-                 +default/search-project
-                 +lookup/definition
-                 +lookup/implementations
-                 +lookup/references
-                 +lookup/type-definition))
-    (add-to-list 'preview-tab-commands cmd))
-  (preview-tab-mode 1))
+  :config (preview-tab-mode 1))
 ```
 
 Then run `doom sync` and restart Emacs.
+
+That covers `+lookup/definition`, `+lookup/references`, `+lookup/implementations`
+and `+lookup/type-definition`, along with the `+default/search-*` family and the
+`+vertico/`, `+ivy/` and `+helm/` project searches they dispatch to.
+`+lookup/file` is left out, like `find-file`: pointing at a path and asking for
+it is a deliberate act. It comes along with
+[`preview-tab-include-find-file`](#previewing-find-file) if you want it.
 
 One more Doom default is worth changing. Out of the box, `consult` shows you the
 file under point as you move down the candidate list; Doom turns that off, so
@@ -129,8 +129,8 @@ a preview if the command that opened it is in `preview-tab-commands`.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `preview-tab-commands` | Dired, Treemacs, Magit, xref, compile/grep, flymake, consult | Commands whose file visits are previews. |
-| `preview-tab-include-find-file` | nil | Whether `find-file` and `magit-find-file` preview too. |
+| `preview-tab-commands` | Dired, Treemacs, Magit, xref, compile/grep, flymake, consult, Doom | Commands whose file visits are previews. |
+| `preview-tab-include-find-file` | nil | Whether `find-file`, `magit-find-file` and `+lookup/file` preview too. |
 | `preview-tab-slant-faces` | vanilla, doom-modeline, centaur-tabs faces | Faces italicised while a buffer is a preview. `tab-line-mode` is handled separately, by `preview-tab-tab-line-face`. |
 | `preview-tab-indicator` | `auto` | `auto`, `icon`, `label`, `both`, or nil. |
 | `preview-tab-icon` | `"nf-md-eye_outline"` | [nerd-icons](https://github.com/rainstormstudio/nerd-icons.el) Material Design icon name. |
@@ -154,8 +154,8 @@ become previews.
 
 ### Previewing `find-file`
 
-Neither `find-file` nor `magit-find-file` is a preview source. If you'd rather
-they were:
+Neither `find-file` nor `magit-find-file` is a preview source, and in Doom
+neither is `+lookup/file`. If you'd rather they were:
 
 ```elisp
 (setopt preview-tab-include-find-file t)
@@ -170,8 +170,8 @@ block under [Doom Emacs](#doom-emacs) rather than writing a second one. `:custom
 goes through `customize-set-variable`, which is the machinery this option needs,
 and it is applied before `:config`, so the mode comes up already knowing.
 
-That takes in both, along with their other-window and other-frame variants. It
-also reaches further than the name suggests: a great deal of Emacs opens files
+That takes in all of them, along with the other-window and other-frame variants
+of the first two. It also reaches further than the name suggests: a great deal of Emacs opens files
 by calling `find-file`, so `project-find-file`, `recentf-open-files` and file
 registers start previewing too. Anything going through `find-file-noselect`
 instead is untouched — bookmarks, for one.

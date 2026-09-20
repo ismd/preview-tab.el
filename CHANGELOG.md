@@ -4,6 +4,21 @@ Notable changes to preview-tab. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Doom Emacs jumps and searches are preview sources out of the box:
+  `+lookup/definition`, `+lookup/implementations`, `+lookup/references`,
+  `+lookup/type-definition`, the `+default/search-*` family, and the
+  `+vertico/`, `+ivy/` and `+helm/` project searches those dispatch to. Doom
+  users no longer need to splice them into `preview-tab-commands` by hand —
+  which was also the one mutation pattern the option warns against, since
+  `add-to-list` does not reattach the advice.
+- `preview-tab-include-find-file` now takes in Doom's `+lookup/file` as well.
+  It resolves a path at point and falls back to `find-file-at-point`, so it
+  belongs with `find-file` rather than in the default list.
+
 ## [0.3.0]
 
 ### Added

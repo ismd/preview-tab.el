@@ -158,7 +158,32 @@ variable."
     consult-ripgrep
     consult-grep
     consult-git-grep
-    consult-flymake)
+    consult-flymake
+    ;; Doom Emacs jumps
+    +lookup/definition
+    +lookup/implementations
+    +lookup/references
+    +lookup/type-definition
+    ;; Doom Emacs searches.  The `+default/' commands are the ones users
+    ;; reach for; each dispatches to the `+vertico/', `+ivy/' or `+helm/'
+    ;; command of whichever completion module is enabled.  Those are listed
+    ;; too, for configurations that bind them directly -- reached through a
+    ;; dispatcher they are a no-op, because the outer command already owns
+    ;; the preview.
+    +default/search-cwd
+    +default/search-other-cwd
+    +default/search-project
+    +default/search-other-project
+    +default/search-project-for-symbol-at-point
+    +default/search-emacsd
+    +default/search-notes-for-symbol-at-point
+    +default/org-notes-search
+    +vertico/project-search
+    +vertico/project-search-from-cwd
+    +ivy/project-search
+    +ivy/project-search-from-cwd
+    +helm/project-search
+    +helm/project-search-from-cwd)
   "Commands whose file visits are treated as temporary previews.
 
 Commands from packages that are not installed are harmless: advice attaches
@@ -178,7 +203,10 @@ or `add-to-list' will not.
 Note that `find-file' is deliberately absent.  Like VS Code, which does not
 preview from Quick Open either, typing a file name is taken as a deliberate
 act; use `preview-tab-find-file' when you want the other behaviour once, or
-`preview-tab-include-find-file' when you want it always."
+`preview-tab-include-find-file' when you want it always.  Doom's
+`+lookup/file' is absent for the same reason, and goes along with that
+option.  So is `+default/search-buffer', which searches the buffer you are
+already in and opens nothing."
   :type '(repeat function)
   :set #'preview-tab--set-and-refresh
   :group 'preview-tab)
@@ -189,7 +217,8 @@ act; use `preview-tab-find-file' when you want the other behaviour once, or
     find-file-other-frame
     magit-find-file
     magit-find-file-other-window
-    magit-find-file-other-frame)
+    magit-find-file-other-frame
+    +lookup/file)
   "Commands `preview-tab-include-find-file' takes in when it is on.")
 
 (defcustom preview-tab-include-find-file nil
@@ -209,6 +238,10 @@ opens files by calling `find-file' itself, so `project-find-file',
 `recentf-open-files' and jumping to a file register start previewing as
 well.  That is the same instinct one step out, but it is worth knowing
 before you switch it on.
+
+Doom's `+lookup/file' comes along too.  It resolves whatever path is at
+point and, failing anything more specific, hands off to `find-file-at-point'
+-- naming a file by pointing at it, which is the same deliberate act.
 
 `magit-find-file' previews only the worktree version of a file.  Asked
 for a revision it builds a read-only blob buffer, which visits no file on

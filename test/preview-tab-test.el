@@ -264,6 +264,39 @@ the advice is on them is covered by
                  magit-diff-visit-worktree-file-other-frame))
     (should (memq cmd (default-value 'preview-tab-commands)))))
 
+(ert-deftest preview-tab-test-doom-commands-are-entry-points ()
+  "Doom's jumps and searches are previews out of the box.
+Doom is a configuration framework, not a package one can depend on, so this
+checks the list the advice is built from -- as the Magit test above does, and
+for the same reason."
+  (dolist (cmd '(+lookup/definition
+                 +lookup/implementations
+                 +lookup/references
+                 +lookup/type-definition
+                 +default/search-cwd
+                 +default/search-other-cwd
+                 +default/search-project
+                 +default/search-other-project
+                 +default/search-project-for-symbol-at-point
+                 +default/search-emacsd
+                 +default/search-notes-for-symbol-at-point
+                 +default/org-notes-search
+                 +vertico/project-search
+                 +vertico/project-search-from-cwd
+                 +ivy/project-search
+                 +ivy/project-search-from-cwd
+                 +helm/project-search
+                 +helm/project-search-from-cwd))
+    (should (memq cmd (default-value 'preview-tab-commands)))))
+
+(ert-deftest preview-tab-test-doom-deliberate-opens-are-not-entry-points ()
+  "`+lookup/file' and `+default/search-buffer' stay out of the default list.
+The first names a file the way `find-file' does and belongs to
+`preview-tab-include-find-file'; the second searches the buffer you are
+already in and opens nothing."
+  (dolist (cmd '(+lookup/file +default/search-buffer))
+    (should-not (memq cmd (default-value 'preview-tab-commands)))))
+
 
 ;;;; What must never be touched
 
@@ -452,10 +485,10 @@ ever clean it up."
       (should (preview-tab-test--preview-p "a.txt")))))
 
 (ert-deftest preview-tab-test-include-find-file-covers-the-whole-family ()
-  "The option takes in `magit-find-file' and the window and frame variants.
+  "The option takes in `magit-find-file', `+lookup/file' and the variants.
 Checked through the advice rather than the constant, so that it is the
-commands actually taken over that are pinned down.  Magit need not be
-installed for this: the advice goes on the bare symbol either way."
+commands actually taken over that are pinned down.  Neither Magit nor Doom
+need be present for this: the advice goes on the bare symbol either way."
   (preview-tab-test--with-env
     (let ((preview-tab-commands nil)
           (preview-tab-include-find-file t))
@@ -466,7 +499,8 @@ installed for this: the advice goes on the bare symbol either way."
                      find-file-other-frame
                      magit-find-file
                      magit-find-file-other-window
-                     magit-find-file-other-frame))
+                     magit-find-file-other-frame
+                     +lookup/file))
         (should (advice-member-p #'preview-tab--advice cmd)))
       (preview-tab-mode -1))))
 
