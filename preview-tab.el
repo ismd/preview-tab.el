@@ -66,9 +66,6 @@
 (require 'face-remap)
 (require 'seq)
 
-(declare-function nerd-icons-mdicon "nerd-icons" (icon-name &rest args))
-(declare-function tab-line-force-update "tab-line")
-
 
 ;;;; State
 
@@ -97,6 +94,11 @@ the rest of the session.")
   "Rendered mode-line marker.
 `nerd-icons' resolves a name by scanning an alist of several thousand
 entries, which is far too slow to redo on every redisplay.")
+
+(defvar preview-tab--icon-warned nil
+  "Value of `preview-tab-icon' the user has already been warned about.
+The marker is built from inside redisplay, which runs without end: a name
+`nerd-icons' has no icon for has to be reported once, not once a frame.")
 
 (defvar preview-tab--mode-line-entry
   '(preview-tab--previewing (:eval (preview-tab--indicator)))
@@ -307,7 +309,9 @@ nil      no marker; the italicised path is the only cue"
 (defcustom preview-tab-icon "nf-md-eye_outline"
   "Name of the `nerd-icons' Material Design icon marking a preview buffer.
 Used when `preview-tab-indicator' asks for an icon.  The `nerd-icons'
-package is optional; without it the label is shown instead."
+package is optional; without it the label is shown instead.  A name that
+package has no icon for draws nothing, and says so in the *Warnings*
+buffer."
   :type 'string
   :set #'preview-tab--set-indicator
   :group 'preview-tab)
@@ -338,16 +342,67 @@ out of the caller's own list, or out of the constant behind the option."
 
 ;;;; The mode-line marker
 
+(defun preview-tab--icon-table ()
+  "Return the `nerd-icons' table of Material Design icon names, or nil.
+It is the alist that package looks a name up in -- `nerd-icons-mdicon'
+and `nerd-icons-mdicon-data' come of one macro there, so the table read
+here is the one drawing would read.  Nil says there is no `nerd-icons' to
+be had, which is no verdict on any name and must not be taken for one.
+
+`nerd-icons-mdicon' can be bound to nothing more than an autoload --
+`use-package' :commands leaves one, as does a hand-written `autoload' --
+and the table does not exist until the file behind it has been loaded.
+Calling the icon function used to do that loading as a side effect; the
+name has to be vetted before it is called now, so the loading is done
+here, deliberately, instead.
+
+Only ever called once `nerd-icons-mdicon' is bound: a `require' on the
+off-chance would load the package for users who never asked for it."
+  (unless (fboundp 'nerd-icons-mdicon-data)
+    (require 'nerd-icons nil t))
+  (and (fboundp 'nerd-icons-mdicon-data)
+       (nerd-icons-mdicon-data)))
+
+(defun preview-tab--warn-unknown-icon (name)
+  "Report that `nerd-icons' has no Material Design icon called NAME."
+  (display-warning 'preview-tab
+                   (format-message
+                    "`preview-tab-icon' is %S, which names no icon in the \
+`nerd-icons' Material Design set, so no icon is drawn"
+                    name)))
+
+(defun preview-tab--icon ()
+  "Return `preview-tab-icon' as `nerd-icons' draws it, or nil.
+Nil while there is no `nerd-icons' -- the label stands in for the icon
+then -- and nil for a name it has no icon for, which is a misconfigured
+`preview-tab-icon' and is reported, once per name.  The two are told
+apart: a table that is not there yet is no verdict on the name, and
+reporting one would be crying wolf at a name that draws perfectly well
+the moment the package is loaded.
+
+The name is vetted against the table before it is drawn because
+`nerd-icons-mdicon' signals on one it does not know, and this is reached
+from inside redisplay, where nothing would catch that signal.  Redisplay
+is no place to report the mistake either, a warning being a buffer to
+display, so the report is left to a timer and reaches the user from the
+command loop."
+  (when (fboundp 'nerd-icons-mdicon)
+    (let ((table (preview-tab--icon-table)))
+      (cond ((null table) nil)
+            ((assoc preview-tab-icon table)
+             (nerd-icons-mdicon preview-tab-icon))
+            (t (unless (equal preview-tab-icon preview-tab--icon-warned)
+                 (setq preview-tab--icon-warned preview-tab-icon)
+                 (run-with-timer 0 nil #'preview-tab--warn-unknown-icon
+                                 preview-tab-icon))
+               nil)))))
+
 (defun preview-tab--indicator ()
   "Return the mode-line marker for a preview buffer."
   (or preview-tab--indicator-cache
       (let* ((want-icon (and (memq preview-tab-indicator '(auto icon both))
                              preview-tab-icon))
-             (icon (and want-icon
-                        (fboundp 'nerd-icons-mdicon)
-                        ;; nerd-icons signals on an unknown name, and this runs
-                        ;; inside redisplay, where an error is very unwelcome.
-                        (ignore-errors (nerd-icons-mdicon preview-tab-icon))))
+             (icon (and want-icon (preview-tab--icon)))
              (label (and preview-tab-label
                          (or (memq preview-tab-indicator '(label both))
                              (and (eq preview-tab-indicator 'auto) (not icon)))
@@ -357,8 +412,15 @@ out of the caller's own list, or out of the constant behind the option."
                            (icon (concat " " icon))
                            (label (concat " " label))
                            (t ""))))
-        ;; Don't cache a missing icon: `nerd-icons' may just not be loaded yet.
-        (when (or icon (not want-icon))
+        ;; A missing icon is worth recomputing only while `nerd-icons' has
+        ;; yet to be loaded, since loading it is what would change the
+        ;; answer.  Once its table is there the answer is settled either
+        ;; way -- a name in it draws the same icon every time, a name that
+        ;; is not draws nothing every time -- until the option changes,
+        ;; and the setter behind it clears this.  The table, not the icon
+        ;; function: that one can be bound to a bare autoload, with the
+        ;; answer still to come.
+        (when (or (not want-icon) (fboundp 'nerd-icons-mdicon-data))
           (setq preview-tab--indicator-cache marker))
         marker)))
 

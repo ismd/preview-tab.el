@@ -7,8 +7,9 @@ LOAD := -L . -L test
 
 # The icon tests skip themselves unless nerd-icons is on the load path, and
 # skipping is not passing: without it nothing checks that a bad icon name stays
-# quiet inside redisplay.  `make deps' puts a copy under $(ELPA) and test-tty
-# finds it there; set NERD_ICONS to use a checkout you already have instead:
+# quiet inside redisplay and is reported once it is out of it.  `make deps' puts
+# a copy under $(ELPA) and test-tty finds it there; set NERD_ICONS to use a
+# checkout you already have instead:
 #   make test-tty NERD_ICONS=~/.emacs.d/elpa/nerd-icons
 NERD_ICONS ?=
 

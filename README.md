@@ -213,8 +213,10 @@ returned by the time the file appears.
 The preview buffer's path is italicised and a small marker is shown: an eye icon
 with `nerd-icons` installed, otherwise the text `PREVIEW`. Set
 `preview-tab-indicator` to `both` for icon *and* label, or to nil for italics
-only — closest to what VS Code actually does. If your mode line isn't italicised,
-add its faces to `preview-tab-slant-faces`.
+only — closest to what VS Code actually does. `preview-tab-icon` takes any name
+from the `nerd-icons` Material Design set; one it has no icon for draws nothing
+and says so in `*Warnings*`. If your mode line isn't italicised, add its faces
+to `preview-tab-slant-faces`.
 
 Under `tab-line-mode` the preview's tab is italicised as well, and stays that
 way when you select another tab — the VS Code look. This is done by

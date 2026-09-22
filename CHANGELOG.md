@@ -4,6 +4,31 @@ Notable changes to preview-tab. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- A `preview-tab-icon` that `nerd-icons` has no icon for is now looked up and
+  reported rather than drawn and caught. `nerd-icons-mdicon` signals on a name
+  it does not know, and the marker is built inside redisplay, so the call used
+  to be wrapped in `ignore-errors` — which also swallowed the one thing worth
+  saying, that the option is misconfigured. The name is now checked against
+  `nerd-icons`' own table before it is drawn, so nothing can signal, and a name
+  that is not in it is reported once in `*Warnings*`, from a timer that lands
+  the report in the command loop rather than in redisplay. A `nerd-icons` still
+  behind an autoload — what `use-package` `:commands` leaves — is loaded first,
+  as calling the icon function used to do by accident: a table that is not
+  there yet is no verdict on the name, and neither the verdict nor the marker
+  it decides is cached until it is. The verdict is then cached like any other,
+  instead of rescanning several thousand entries on every redisplay.
+
+### Removed
+
+- The `declare-function` forms for `nerd-icons-mdicon` and
+  `tab-line-force-update`. Both calls are gated on `fboundp`, which already
+  tells the byte-compiler what the declarations did, and a declaration left
+  standing goes on covering for whatever real mistake comes along next.
+
 ## [0.4.0]
 
 ### Added

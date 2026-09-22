@@ -45,6 +45,11 @@
   "Render `mode-line-misc-info' as WINDOW would show it."
   (format-mode-line mode-line-misc-info nil (or window (selected-window))))
 
+(defun preview-tab-tty-test--warnings ()
+  "Return everything written to the warnings buffer so far, or nil."
+  (let ((buffer (get-buffer "*Warnings*")))
+    (and buffer (with-current-buffer buffer (buffer-string)))))
+
 (defmacro preview-tab-tty-test--with-env (&rest body)
   "Run BODY with `preview-tab-mode' on and a directory of scratch files."
   (declare (indent 0) (debug t))
@@ -122,16 +127,82 @@
         ;; `auto' shows one or the other, never both.
         (should-not (string-match-p "PREVIEW" rendered))))))
 
-(ert-deftest preview-tab-tty-test-unknown-icon-name-degrades-quietly ()
-  "A bad icon name must not signal from inside redisplay."
+(ert-deftest preview-tab-tty-test-icon-names-are-looked-up ()
+  "The icon name is vetted against the table `nerd-icons' itself reads.
+This is what keeps `nerd-icons-mdicon' from ever being handed a name it
+would signal on."
+  (skip-unless (require 'nerd-icons nil t))
+  (let ((table (preview-tab--icon-table)))
+    (should table)
+    (should (assoc "nf-md-eye_outline" table))
+    (should-not (assoc "nf-md-there-is-no-such-icon" table))))
+
+(ert-deftest preview-tab-tty-test-deferred-nerd-icons-is-loaded-not-faulted ()
+  "A `nerd-icons' still behind an autoload is loaded, not read as a bad name.
+`use-package' :commands and a hand-written `autoload' both leave
+`nerd-icons-mdicon' bound with none of the package behind it, and the
+table the name is vetted against does not exist until it is loaded.  A
+good name must not be faulted for that, and the verdict must not be
+cached while it is still to come."
   (skip-unless (require 'nerd-icons nil t))
   (preview-tab-tty-test--with-env
     (let ((preview-tab-indicator 'icon)
-          (preview-tab-icon "nf-md-there-is-no-such-icon"))
+          (preview-tab-icon "nf-md-eye_outline")
+          (preview-tab--icon-warned nil)
+          (mdicon (symbol-function 'nerd-icons-mdicon))
+          (mdicon-data (symbol-function 'nerd-icons-mdicon-data))
+          ;; `features' is not a special variable, so `let' would bind a
+          ;; lexical one of its own and leave the real list alone.
+          (loaded features))
       (setq preview-tab--indicator-cache nil)
-      (preview-tab-tty-test-open "a.txt")
-      (preview-tab-tty-test--settle)
-      (should (equal "" (preview-tab-tty-test--misc-info))))))
+      (when (get-buffer "*Warnings*") (kill-buffer "*Warnings*"))
+      (unwind-protect
+          (progn
+            ;; Put the package back the way a deferring init file leaves it.
+            (setq features (remq 'nerd-icons features))
+            (fmakunbound 'nerd-icons-mdicon-data)
+            (fset 'nerd-icons-mdicon '(autoload "nerd-icons" nil nil nil))
+            (preview-tab-tty-test-open "a.txt")
+            (preview-tab-tty-test--settle)
+            (should (string-match-p (regexp-quote (char-to-string #Xf06d0))
+                                    (preview-tab-tty-test--misc-info)))
+            ;; Nothing to warn about, now or once the timers have run.
+            (preview-tab-tty-test--settle)
+            (should-not (preview-tab-tty-test--warnings)))
+        (setq features loaded)
+        (fset 'nerd-icons-mdicon mdicon)
+        (fset 'nerd-icons-mdicon-data mdicon-data)))))
+
+(ert-deftest preview-tab-tty-test-unknown-icon-name-is-reported-not-signalled ()
+  "A bad icon name signals nothing, falls back, and is reported once."
+  (skip-unless (require 'nerd-icons nil t))
+  (preview-tab-tty-test--with-env
+    (let ((preview-tab-indicator 'icon)
+          (preview-tab-icon "nf-md-there-is-no-such-icon")
+          (preview-tab--icon-warned nil)
+          ;; The report displays a buffer, and a window it split off the
+          ;; frame here is a window the rest of the suite never asked for.
+          (display-buffer-alist '(("\\`\\*Warnings\\*\\'"
+                                   (display-buffer-no-window)
+                                   (allow-no-window . t)))))
+      (setq preview-tab--indicator-cache nil)
+      (when (get-buffer "*Warnings*") (kill-buffer "*Warnings*"))
+      (unwind-protect
+          (progn
+            (preview-tab-tty-test-open "a.txt")
+            (preview-tab-tty-test--settle)
+            (should (equal "" (preview-tab-tty-test--misc-info)))
+            ;; The report is left to a timer, which runs while this waits.
+            (preview-tab-tty-test--settle)
+            (should (string-match-p "nf-md-there-is-no-such-icon"
+                                    (or (preview-tab-tty-test--warnings) "")))
+            ;; `auto' has somewhere to fall back to, and falls back.
+            (let ((preview-tab-indicator 'auto)
+                  (preview-tab-label "PREVIEW"))
+              (setq preview-tab--indicator-cache nil)
+              (should (string-match-p "PREVIEW"
+                                      (preview-tab-tty-test--misc-info)))))
+        (when (get-buffer "*Warnings*") (kill-buffer "*Warnings*"))))))
 
 (defun preview-tab-tty-test--tab-face (name)
   "Return the face the selected window's tab line draws the tab NAME with.
