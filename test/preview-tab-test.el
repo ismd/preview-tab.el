@@ -303,7 +303,7 @@ for the same reason."
 (ert-deftest preview-tab-test-doom-deliberate-opens-are-not-entry-points ()
   "`+lookup/file' and `+default/search-buffer' stay out of the default list.
 The first names a file the way `find-file' does and belongs to
-`preview-tab-include-find-file'; the second searches the buffer you are
+`preview-tab-include-named-files'; the second searches the buffer you are
 already in and opens nothing."
   (dolist (cmd '(+lookup/file +default/search-buffer))
     (should-not (memq cmd (default-value 'preview-tab-commands)))))
@@ -504,18 +504,18 @@ ever clean it up."
 
 ;;;; Including find-file
 
-(ert-deftest preview-tab-test-include-find-file-previews-it ()
-  "With `preview-tab-include-find-file' on, `find-file' previews."
+(ert-deftest preview-tab-test-include-named-files-previews-it ()
+  "With `preview-tab-include-named-files' on, `find-file' previews."
   (preview-tab-test--with-env
     (let ((preview-tab-commands nil)
-          (preview-tab-include-find-file t))
+          (preview-tab-include-named-files t))
       (preview-tab-mode -1)
       (preview-tab-mode 1)
       (find-file (preview-tab-test--file "a.txt"))
       (preview-tab-test--settle)
       (should (preview-tab-test--preview-p "a.txt")))))
 
-(ert-deftest preview-tab-test-include-find-file-covers-the-whole-family ()
+(ert-deftest preview-tab-test-include-named-files-covers-the-whole-family ()
   "The option takes in `magit-find-file', `+lookup/file', `org-roam-node-find'.
 Along with the variants.  Checked through the advice rather than the
 constant, so that it is the commands actually taken over that are pinned
@@ -523,7 +523,7 @@ down.  Neither Magit, Doom nor Org-roam need be present for this: the advice
 goes on the bare symbol either way."
   (preview-tab-test--with-env
     (let ((preview-tab-commands nil)
-          (preview-tab-include-find-file t))
+          (preview-tab-include-named-files t))
       (preview-tab-mode -1)
       (preview-tab-mode 1)
       (dolist (cmd '(find-file
@@ -543,7 +543,7 @@ That is the documented way to have it without `magit-find-file', which the
 option takes along."
   (preview-tab-test--with-env
     (let ((preview-tab-commands '(find-file))
-          (preview-tab-include-find-file nil))
+          (preview-tab-include-named-files nil))
       (preview-tab-mode -1)
       (preview-tab-mode 1)
       (should-not (advice-member-p #'preview-tab--advice 'magit-find-file))
@@ -790,7 +790,7 @@ advice."
 It is a command the whole of Emacs calls, and advice left behind on it
 would go on marking and killing buffers for the rest of the session."
   (preview-tab-test--with-env
-    (let ((preview-tab-include-find-file t))
+    (let ((preview-tab-include-named-files t))
       (preview-tab-mode -1)
       (preview-tab-mode 1)
       (should (advice-member-p #'preview-tab--advice 'find-file))

@@ -52,7 +52,7 @@
 ;;   `preview-tab-keep'       keep the current preview buffer for good
 ;;
 ;; Typing a file name is taken as a deliberate act and opens the file for good,
-;; as in VS Code.  Set `preview-tab-include-find-file' if you would rather
+;; as in VS Code.  Set `preview-tab-include-named-files' if you would rather
 ;; `find-file' previewed too.
 ;;
 ;; The current preview is marked in the mode line: the buffer path is italicised
@@ -205,7 +205,7 @@ or `add-to-list' will not.
 Note that `find-file' is deliberately absent.  Like VS Code, which does not
 preview from Quick Open either, typing a file name is taken as a deliberate
 act; use `preview-tab-find-file' when you want the other behaviour once, or
-`preview-tab-include-find-file' when you want it always.  Doom's
+`preview-tab-include-named-files' when you want it always.  Doom's
 `+lookup/file' is absent for the same reason, as is `org-roam-node-find',
 and both go along with that option.  So is `+default/search-buffer', which
 searches the buffer you are already in and opens nothing."
@@ -213,7 +213,7 @@ searches the buffer you are already in and opens nothing."
   :set #'preview-tab--set-and-refresh
   :group 'preview-tab)
 
-(defconst preview-tab--find-file-commands
+(defconst preview-tab--named-file-commands
   '(find-file
     find-file-other-window
     find-file-other-frame
@@ -222,10 +222,10 @@ searches the buffer you are already in and opens nothing."
     magit-find-file-other-frame
     +lookup/file
     org-roam-node-find)
-  "Commands `preview-tab-include-find-file' takes in when it is on.")
+  "Commands `preview-tab-include-named-files' takes in when it is on.")
 
-(defcustom preview-tab-include-find-file nil
-  "Whether `find-file' opens a preview too.
+(defcustom preview-tab-include-named-files nil
+  "Whether files you open by naming them are previewed too.
 
 Off by default, because naming a file is a deliberate act -- see
 `preview-tab-commands'.  Turn it on and `find-file' and `magit-find-file'
@@ -236,7 +236,7 @@ These are advised alongside `preview-tab-commands', so everything said
 there applies here too -- including that changing this while the mode is
 on only takes effect through the customize machinery.
 
-Turning this on reaches further than the name suggests.  Much of Emacs
+Turning this on reaches further than the commands it names.  Much of Emacs
 opens files by calling `find-file' itself, so `project-find-file',
 `recentf-open-files' and jumping to a file register start previewing as
 well.  That is the same instinct one step out, but it is worth knowing
@@ -338,13 +338,13 @@ Used when `preview-tab-indicator' asks for a label."
 (defun preview-tab--commands-to-advise ()
   "Return every command the mode should take over.
 `preview-tab-commands', and the `find-file' family as well when
-`preview-tab-include-find-file' is on.  `seq-uniq' rather than
+`preview-tab-include-named-files' is on.  `seq-uniq' rather than
 `delete-dups': a command named in both must be advised once, and the
 result has to be a fresh list -- the destructive one would splice a cons
 out of the caller's own list, or out of the constant behind the option."
   (seq-uniq (append preview-tab-commands
-                    (and preview-tab-include-find-file
-                         preview-tab--find-file-commands))))
+                    (and preview-tab-include-named-files
+                         preview-tab--named-file-commands))))
 
 
 ;;;; The mode-line marker

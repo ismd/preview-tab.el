@@ -46,7 +46,7 @@ Two things deliberately do **not** happen, both matching VS Code:
 `find-file` is **not** a preview source: typing a file name is a deliberate act,
 and VS Code does not preview from Quick Open either. To peek at a named file,
 use `preview-tab-find-file` — or turn the rule off, see
-[Previewing `find-file`](#previewing-find-file).
+[Previewing named files](#previewing-named-files).
 
 ## Commands
 
@@ -105,7 +105,7 @@ and `+lookup/type-definition`, along with the `+default/search-*` family and the
 `+vertico/`, `+ivy/` and `+helm/` project searches they dispatch to.
 `+lookup/file` is left out, like `find-file`: pointing at a path and asking for
 it is a deliberate act. It comes along with
-[`preview-tab-include-find-file`](#previewing-find-file) if you want it.
+[`preview-tab-include-named-files`](#previewing-named-files) if you want it.
 
 One more Doom default is worth changing. Out of the box, `consult` shows you the
 file under point as you move down the candidate list; Doom turns that off, so
@@ -131,7 +131,7 @@ a preview if the command that opened it is in `preview-tab-commands`.
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `preview-tab-commands` | Dired, Treemacs, Magit, xref, compile/grep, flymake, consult, Doom | Commands whose file visits are previews. |
-| `preview-tab-include-find-file` | nil | Whether `find-file`, `magit-find-file`, `+lookup/file` and `org-roam-node-find` preview too. |
+| `preview-tab-include-named-files` | nil | Whether `find-file`, `magit-find-file`, `+lookup/file` and `org-roam-node-find` preview too. |
 | `preview-tab-slant-faces` | vanilla, doom-modeline, centaur-tabs faces | Faces italicised while a buffer is a preview. `tab-line-mode` is handled separately, by `preview-tab-tab-line-face`. |
 | `preview-tab-indicator` | `auto` | `auto`, `icon`, `label`, `both`, or nil. |
 | `preview-tab-icon` | `"nf-md-eye_outline"` | [nerd-icons](https://github.com/rainstormstudio/nerd-icons.el) Material Design icon name. |
@@ -153,32 +153,33 @@ seen from an added or context line, open the real worktree file — as does
 `magit-diff-visit-worktree-file` (`C-j`, or `C-<return>`) from anywhere. Those
 become previews.
 
-### Previewing `find-file`
+### Previewing named files
 
 Neither `find-file` nor `magit-find-file` is a preview source, and in Doom
 neither is `+lookup/file`. Nor is `org-roam-node-find`, which names a note by
 its title. If you'd rather they were:
 
 ```elisp
-(setopt preview-tab-include-find-file t)
+(setopt preview-tab-include-named-files t)
 ```
 
 `setopt` arrives in Emacs 29. Before that — here and everywhere else this README
 reaches for it — `customize-set-variable` does the same job:
-`(customize-set-variable 'preview-tab-include-find-file t)`.
+`(customize-set-variable 'preview-tab-include-named-files t)`.
 
-In Doom, add `:custom (preview-tab-include-find-file t)` to the `use-package!`
+In Doom, add `:custom (preview-tab-include-named-files t)` to the `use-package!`
 block under [Doom Emacs](#doom-emacs) rather than writing a second one. `:custom`
 goes through `customize-set-variable`, which is the machinery this option needs,
 and it is applied before `:config`, so the mode comes up already knowing.
 
 That takes in all of them, along with the other-window and other-frame variants
-of the first two. It also reaches further than the name suggests: a great deal of Emacs opens files
-by calling `find-file`, so `project-find-file`, `recentf-open-files` and file
-registers start previewing too. Anything going through `find-file-noselect`
-instead is untouched — bookmarks, for one. `org-roam-node-find` goes that way
-too, which is why the option names it outright. A title with no note behind it
-starts a capture instead, and the new note is kept as an ordinary buffer.
+of the first two. It also reaches further than the commands it names: a great
+deal of Emacs opens files by calling `find-file`, so `project-find-file`,
+`recentf-open-files` and file registers start previewing too. Anything going
+through `find-file-noselect` instead is untouched — bookmarks, for one.
+`org-roam-node-find` goes that way too, which is why the option names it
+outright. A title with no note behind it starts a capture instead, and the new
+note is kept as an ordinary buffer.
 
 I run with this on myself: the wider reach turns out to be the same instinct one
 step out, not a surprise in kind.

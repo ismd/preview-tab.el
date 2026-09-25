@@ -8,10 +8,17 @@ Notable changes to preview-tab. The format follows
 
 ### Added
 
-- `preview-tab-include-find-file` now takes in `org-roam-node-find`. Picking a
-  note by title is naming it, so it belongs with `find-file` rather than in the
-  default list. It has to be named outright: it visits the note with
+- `preview-tab-include-named-files` now takes in `org-roam-node-find`. Picking
+  a note by title is naming it, so it belongs with `find-file` rather than in
+  the default list. It has to be named outright: it visits the note with
   `find-file-noselect`, so turning the option on used to leave it untouched.
+
+### Changed
+
+- `preview-tab-include-find-file` is now `preview-tab-include-named-files`.
+  The name had stopped describing the option once `magit-find-file`,
+  `+lookup/file` and `org-roam-node-find` came along, the last of which never
+  calls `find-file` at all. No alias is kept for the old name.
 
 ### Fixed
 
