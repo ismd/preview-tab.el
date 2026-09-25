@@ -206,9 +206,9 @@ Note that `find-file' is deliberately absent.  Like VS Code, which does not
 preview from Quick Open either, typing a file name is taken as a deliberate
 act; use `preview-tab-find-file' when you want the other behaviour once, or
 `preview-tab-include-find-file' when you want it always.  Doom's
-`+lookup/file' is absent for the same reason, and goes along with that
-option.  So is `+default/search-buffer', which searches the buffer you are
-already in and opens nothing."
+`+lookup/file' is absent for the same reason, as is `org-roam-node-find',
+and both go along with that option.  So is `+default/search-buffer', which
+searches the buffer you are already in and opens nothing."
   :type '(repeat function)
   :set #'preview-tab--set-and-refresh
   :group 'preview-tab)
@@ -220,7 +220,8 @@ already in and opens nothing."
     magit-find-file
     magit-find-file-other-window
     magit-find-file-other-frame
-    +lookup/file)
+    +lookup/file
+    org-roam-node-find)
   "Commands `preview-tab-include-find-file' takes in when it is on.")
 
 (defcustom preview-tab-include-find-file nil
@@ -244,6 +245,12 @@ before you switch it on.
 Doom's `+lookup/file' comes along too.  It resolves whatever path is at
 point and, failing anything more specific, hands off to `find-file-at-point'
 -- naming a file by pointing at it, which is the same deliberate act.
+
+So does `org-roam-node-find', which names a note by its title.  It has to
+be taken in by name: it visits the note with `find-file-noselect', which
+nothing here advises, so turning this on would not reach it otherwise.  A
+title with no note behind it starts an Org capture instead, and the new
+note stays an ordinary buffer -- see `preview-tab--adopt'.
 
 `magit-find-file' previews only the worktree version of a file.  Asked
 for a revision it builds a read-only blob buffer, which visits no file on
@@ -578,8 +585,15 @@ KNOWN is the `buffer-list' from before the command ran."
                      (car new)))
          (shown (window-buffer (selected-window))))
     (cond
-     ;; A file buffer that did not exist before: this is the preview.
-     (opened (preview-tab--mark opened))
+     ;; A file buffer that did not exist before: this is the preview -- unless
+     ;; the command has already edited it.  Editing is what makes a preview
+     ;; permanent, and `first-change-hook' will not say so for an edit that
+     ;; came first.  Nor for one made through an indirect buffer, which is how
+     ;; Org capture writes a new note: the hook runs in the buffer being
+     ;; typed in, not in the one visiting the file.  Marked anyway, the note
+     ;; would be killed by the next preview as soon as it had been saved.
+     (opened (unless (buffer-modified-p opened)
+               (preview-tab--mark opened)))
      ;; Revisiting the current preview keeps it a preview.  Anything else was
      ;; already open, and stays permanent.
      ((eq shown preview-tab-buffer) (preview-tab--mark shown)))))

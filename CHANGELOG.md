@@ -4,6 +4,25 @@ Notable changes to preview-tab. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `preview-tab-include-find-file` now takes in `org-roam-node-find`. Picking a
+  note by title is naming it, so it belongs with `find-file` rather than in the
+  default list. It has to be named outright: it visits the note with
+  `find-file-noselect`, so turning the option on used to leave it untouched.
+
+### Fixed
+
+- A file the command has already written into is no longer made a preview.
+  Editing is what promotes a preview, but `first-change-hook` does not hear of
+  an edit made before the buffer was marked, nor of one made through an
+  indirect buffer — which is how Org capture writes a new note, and so what
+  `org-roam-node-find` does for a title with no note behind it. Such a buffer
+  used to be marked anyway, and was killed by the next preview as soon as it
+  had been saved.
+
 ## [0.5.0]
 
 ### Changed

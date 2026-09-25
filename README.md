@@ -30,7 +30,8 @@ A buffer becomes a **preview** when a command in `preview-tab-commands` visits a
 file that was not already open.
 
 It stops being a preview — permanently — when you **edit it** (the first change
-promotes it) or run **`preview-tab-keep`**.
+promotes it) or run **`preview-tab-keep`**. A file the command has already
+written into, as Org capture does with a new note, is never a preview at all.
 
 The preview is killed when the next preview takes its place, *unless* it is
 modified, visible in another window, or running a process. Those quietly become
@@ -130,7 +131,7 @@ a preview if the command that opened it is in `preview-tab-commands`.
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `preview-tab-commands` | Dired, Treemacs, Magit, xref, compile/grep, flymake, consult, Doom | Commands whose file visits are previews. |
-| `preview-tab-include-find-file` | nil | Whether `find-file`, `magit-find-file` and `+lookup/file` preview too. |
+| `preview-tab-include-find-file` | nil | Whether `find-file`, `magit-find-file`, `+lookup/file` and `org-roam-node-find` preview too. |
 | `preview-tab-slant-faces` | vanilla, doom-modeline, centaur-tabs faces | Faces italicised while a buffer is a preview. `tab-line-mode` is handled separately, by `preview-tab-tab-line-face`. |
 | `preview-tab-indicator` | `auto` | `auto`, `icon`, `label`, `both`, or nil. |
 | `preview-tab-icon` | `"nf-md-eye_outline"` | [nerd-icons](https://github.com/rainstormstudio/nerd-icons.el) Material Design icon name. |
@@ -155,7 +156,8 @@ become previews.
 ### Previewing `find-file`
 
 Neither `find-file` nor `magit-find-file` is a preview source, and in Doom
-neither is `+lookup/file`. If you'd rather they were:
+neither is `+lookup/file`. Nor is `org-roam-node-find`, which names a note by
+its title. If you'd rather they were:
 
 ```elisp
 (setopt preview-tab-include-find-file t)
@@ -174,7 +176,9 @@ That takes in all of them, along with the other-window and other-frame variants
 of the first two. It also reaches further than the name suggests: a great deal of Emacs opens files
 by calling `find-file`, so `project-find-file`, `recentf-open-files` and file
 registers start previewing too. Anything going through `find-file-noselect`
-instead is untouched — bookmarks, for one.
+instead is untouched — bookmarks, for one. `org-roam-node-find` goes that way
+too, which is why the option names it outright. A title with no note behind it
+starts a capture instead, and the new note is kept as an ordinary buffer.
 
 I run with this on myself: the wider reach turns out to be the same instinct one
 step out, not a surprise in kind.

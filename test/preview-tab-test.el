@@ -58,6 +58,17 @@ Models a command that gets as far as the file and then trips over something
   (preview-tab-test-open name)
   (error "Nothing further to see here"))
 
+(defun preview-tab-test-capture (name)
+  "Stand-in command: write into scratch file NAME through an indirect buffer.
+Models Org capture, which `org-roam-node-find' falls back on for a title
+with no note behind it: the file's buffer is edited but never shown, and
+the buffer on screen visits no file at all."
+  (interactive "sFile: ")
+  (switch-to-buffer
+   (make-indirect-buffer (find-file-noselect (preview-tab-test--file name))
+                         (generate-new-buffer-name "CAPTURE")))
+  (insert "captured\n"))
+
 (defun preview-tab-test--settle ()
   "Let the zero-delay reap timer run."
   (dotimes (_ 5) (sit-for 0.02)))
@@ -321,6 +332,26 @@ open."
     (should (preview-tab-test--live-p "b.txt"))
     (should (preview-tab-test--preview-p "b.txt"))))
 
+(ert-deftest preview-tab-test-edited-on-arrival-is-not-a-preview ()
+  "A file the command has already written into stays an ordinary buffer.
+Editing is what promotes a preview, and an edit made before the buffer was
+marked -- or through an indirect buffer, as Org capture makes it -- never
+reaches `first-change-hook'.  Marked anyway, the new note would be killed
+by the next preview once saved.  The standing preview is left alone, as for
+any other permanent visit."
+  (preview-tab-test--with-env
+    (let ((preview-tab-commands '(preview-tab-test-open
+                                  preview-tab-test-capture)))
+      (preview-tab-mode -1)
+      (preview-tab-mode 1)
+      (preview-tab-test-open "a.txt")
+      (preview-tab-test--settle)
+      (preview-tab-test-capture "b.txt")
+      (preview-tab-test--settle)
+      (should (preview-tab-test--live-p "b.txt"))
+      (should-not (preview-tab-test--preview-p "b.txt"))
+      (should (preview-tab-test--preview-p "a.txt")))))
+
 (ert-deftest preview-tab-test-visible-preview-is-not-killed ()
   "A preview still shown in some window survives the next preview."
   (preview-tab-test--with-env
@@ -485,10 +516,11 @@ ever clean it up."
       (should (preview-tab-test--preview-p "a.txt")))))
 
 (ert-deftest preview-tab-test-include-find-file-covers-the-whole-family ()
-  "The option takes in `magit-find-file', `+lookup/file' and the variants.
-Checked through the advice rather than the constant, so that it is the
-commands actually taken over that are pinned down.  Neither Magit nor Doom
-need be present for this: the advice goes on the bare symbol either way."
+  "The option takes in `magit-find-file', `+lookup/file', `org-roam-node-find'.
+Along with the variants.  Checked through the advice rather than the
+constant, so that it is the commands actually taken over that are pinned
+down.  Neither Magit, Doom nor Org-roam need be present for this: the advice
+goes on the bare symbol either way."
   (preview-tab-test--with-env
     (let ((preview-tab-commands nil)
           (preview-tab-include-find-file t))
@@ -500,7 +532,8 @@ need be present for this: the advice goes on the bare symbol either way."
                      magit-find-file
                      magit-find-file-other-window
                      magit-find-file-other-frame
-                     +lookup/file))
+                     +lookup/file
+                     org-roam-node-find))
         (should (advice-member-p #'preview-tab--advice cmd)))
       (preview-tab-mode -1))))
 
